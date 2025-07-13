@@ -6,11 +6,11 @@ let fps = 60;
 // Game state
 const gameState = {
     player: {
-        x: 600,
-        y: 500,
-        targetX: 600,
-        targetY: 500,
-        speed: 4,
+        x: 50,
+        y: 60,
+        targetX: 50,
+        targetY: 60,
+        speed: 2,
         isDancing: false,
         name: 'You'
     },
@@ -30,14 +30,14 @@ const gameState = {
     isPanelMinimized: false
 };
 
-// Building locations for job system
+// Building locations for job system (in percentages)
 const buildings = {
-    cafe: { x: 160, y: 200, name: "Cafe" },
-    shop: { x: 350, y: 240, name: "Shop" },
-    park: { x: 600, y: 195, name: "Park" },
-    townhall: { x: 875, y: 240, name: "Town Hall" },
-    townSquare: { x: 600, y: 500, name: "Town Square" },
-    taverna: { x: 230, y: 410, name: "Taverna Dimitri" }
+    cafe: { x: 15, y: 24, name: "Cafe" },
+    shop: { x: 31, y: 30, name: "Shop" },
+    park: { x: 54, y: 24, name: "Park" },
+    townhall: { x: 76, y: 29, name: "Town Hall" },
+    townSquare: { x: 49, y: 62, name: "Town Square" },
+    taverna: { x: 22, y: 51, name: "Taverna Dimitri" }
 };
 
 // Cache DOM elements
@@ -185,11 +185,11 @@ function handleTapToMove(e) {
     
     const rect = elements.walkableArea.getBoundingClientRect();
     const touch = e.touches ? e.touches[0] : e;
-    const x = (touch.clientX - rect.left) / gameState.camera.zoom;
-    const y = (touch.clientY - rect.top) / gameState.camera.zoom;
+    const x = ((touch.clientX - rect.left) / rect.width) * 100;
+    const y = ((touch.clientY - rect.top) / rect.height) * 100;
     
-    gameState.player.targetX = Math.max(0, Math.min(1150, x));
-    gameState.player.targetY = Math.max(0, Math.min(750, y));
+    gameState.player.targetX = Math.max(5, Math.min(95, x));
+    gameState.player.targetY = Math.max(5, Math.min(95, y));
 }
 
 // Toggle UI Panel
@@ -267,8 +267,8 @@ function emote(emoticon) {
     const bubble = document.createElement('div');
     bubble.className = 'emote-bubble';
     bubble.textContent = emoticon;
-    bubble.style.left = (gameState.player.x + 25) + 'px';
-    bubble.style.top = (gameState.player.y - 10) + 'px';
+    bubble.style.left = (gameState.player.x + 3) + '%';
+    bubble.style.top = (gameState.player.y - 1) + '%';
     
     elements.gameWorld.appendChild(bubble);
     
@@ -291,8 +291,8 @@ function toggleDance() {
 
 // Update player position
 function updatePlayerPosition() {
-    elements.player.style.left = gameState.player.x + 'px';
-    elements.player.style.top = gameState.player.y + 'px';
+    elements.player.style.left = gameState.player.x + '%';
+    elements.player.style.top = gameState.player.y + '%';
 }
 
 // Greek Plumber AI System
@@ -320,8 +320,8 @@ function createGreekPlumber() {
     };
     
     plumber.element.className = 'player greek-plumber';
-    plumber.element.style.left = plumber.x + 'px';
-    plumber.element.style.top = plumber.y + 'px';
+    plumber.element.style.left = plumber.x + '%';
+    plumber.element.style.top = plumber.y + '%';
     
     // Add name label
     const nameLabel = document.createElement('div');
@@ -389,8 +389,8 @@ function plumberChat(plumber, message) {
     const bubble = document.createElement('div');
     bubble.className = 'emote-bubble';
     bubble.textContent = '💬';
-    bubble.style.left = (plumber.x + 25) + 'px';
-    bubble.style.top = (plumber.y - 10) + 'px';
+    bubble.style.left = (plumber.x + 3) + '%';
+    bubble.style.top = (plumber.y - 1) + '%';
     
     elements.gameWorld.appendChild(bubble);
     
@@ -473,12 +473,12 @@ function updateGreekPlumbers(deltaTime) {
         }
         
         // Keep in bounds
-        plumber.x = Math.max(0, Math.min(1160, plumber.x));
-        plumber.y = Math.max(0, Math.min(760, plumber.y));
+        plumber.x = Math.max(5, Math.min(95, plumber.x));
+        plumber.y = Math.max(5, Math.min(95, plumber.y));
         
         // Update position
-        plumber.element.style.left = plumber.x + 'px';
-        plumber.element.style.top = plumber.y + 'px';
+        plumber.element.style.left = plumber.x + '%';
+        plumber.element.style.top = plumber.y + '%';
         
         // Handle dancing at taverna
         if (plumber.state === 'socializing' && !plumber.isDancing && Math.random() < 0.0008) {
@@ -583,8 +583,8 @@ function showPlumberEmote(plumber, emote) {
     const bubble = document.createElement('div');
     bubble.className = 'emote-bubble';
     bubble.textContent = emote;
-    bubble.style.left = (plumber.x + 25) + 'px';
-    bubble.style.top = (plumber.y - 10) + 'px';
+    bubble.style.left = (plumber.x + 3) + '%';
+    bubble.style.top = (plumber.y - 1) + '%';
     
     elements.gameWorld.appendChild(bubble);
     setTimeout(() => bubble.remove(), 2000);
@@ -665,8 +665,8 @@ function updatePlayerMovement(deltaTime) {
     }
     
     // Keep player in bounds
-    gameState.player.x = Math.max(0, Math.min(1150, gameState.player.x));
-    gameState.player.y = Math.max(0, Math.min(750, gameState.player.y));
+    gameState.player.x = Math.max(5, Math.min(95, gameState.player.x));
+    gameState.player.y = Math.max(5, Math.min(95, gameState.player.y));
     
     if (moved) {
         updatePlayerPosition();
