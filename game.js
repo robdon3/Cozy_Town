@@ -41,23 +41,31 @@ const buildings = {
 };
 
 // Cache DOM elements
-const elements = {
-    player: document.getElementById('player'),
-    chatBox: document.getElementById('chatBox'),
-    chatInput: document.getElementById('chatInput'),
-    walkableArea: document.getElementById('walkableArea'),
-    gameWorld: document.getElementById('gameWorld'),
-    joystickKnob: document.getElementById('joystickKnob'),
-    mobileJoystick: document.getElementById('mobileJoystick'),
-    uiPanel: document.getElementById('uiPanel'),
-    loadingScreen: document.getElementById('loadingScreen')
-};
+let elements = {};
+
+function cacheElements() {
+    elements = {
+        player: document.getElementById('player'),
+        chatBox: document.getElementById('chatBox'),
+        chatInput: document.getElementById('chatInput'),
+        walkableArea: document.getElementById('walkableArea'),
+        gameWorld: document.getElementById('gameWorld'),
+        joystickKnob: document.getElementById('joystickKnob'),
+        mobileJoystick: document.getElementById('mobileJoystick'),
+        uiPanel: document.getElementById('uiPanel'),
+        loadingScreen: document.getElementById('loadingScreen')
+    };
+}
 
 // Greek plumber names
 const plumberNames = ['Dimitris', 'Nikos', 'Yiannis', 'Kostas', 'Michalis', 'Panagiotis', 'Stavros', 'Georgios', 'Andreas', 'Christos', 'Alexandros', 'Spyros', 'Petros', 'Yannis', 'Manolis', 'Takis', 'Giannis', 'Vasilis', 'Antonis', 'Lefteris', 'Sotiris', 'Thanasis', 'Fotis', 'Nikolas', 'Marios', 'Konstantinos', 'Ioannis', 'Apostolos', 'Evangelos', 'Athanasios'];
 
 // Initialize game
 function initGame() {
+    console.log('Initializing game...');
+    cacheElements();
+    console.log('Elements cached:', Object.keys(elements));
+    
     setupEventListeners();
     setupMobileControls();
     updateCamera();
@@ -75,13 +83,21 @@ function initGame() {
     
     // Initialize job board
     updateJobBoard();
+    console.log('Game initialized successfully');
 }
 
 function hideLoadingScreen() {
+    console.log('Hiding loading screen...');
+    if (!elements.loadingScreen) {
+        console.error('Loading screen element not found!');
+        return;
+    }
+    
     setTimeout(() => {
         elements.loadingScreen.style.opacity = '0';
         setTimeout(() => {
             elements.loadingScreen.style.display = 'none';
+            console.log('Loading screen hidden');
         }, 500);
     }, 1000);
 }
@@ -101,13 +117,19 @@ function setupEventListeners() {
     elements.walkableArea.addEventListener('touchend', handleTapToMove);
 
     // UI Panel minimize
-    document.getElementById('uiPanelHandle').addEventListener('click', toggleUIPanel);
+    const uiPanelHandle = document.getElementById('uiPanelHandle');
+    if (uiPanelHandle) {
+        uiPanelHandle.addEventListener('click', toggleUIPanel);
+    }
 
     // Zoom button (disabled for mobile-first design)
     // document.getElementById('zoomBtn').addEventListener('click', cycleZoom);
 
     // Menu button
-    document.getElementById('menuBtn').addEventListener('click', showMenu);
+    const menuBtn = document.getElementById('menuBtn');
+    if (menuBtn) {
+        menuBtn.addEventListener('click', showMenu);
+    }
 
     // Prevent scrolling
     document.addEventListener('touchmove', (e) => {
