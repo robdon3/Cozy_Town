@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#87CEEB">
+    <meta name="msapplication-TileColor" content="#87CEEB">
+    <meta name="format-detection" content="telephone=no">
+    <title>Cozy Town</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loadingScreen">
+        <div class="loading-icon">🏠</div>
+        <div class="loading-text">Loading Cozy Town...</div>
+    </div>
+
+    <div id="gameContainer">
+        <div id="gameWorld">
+            <div class="walkable-area" id="walkableArea"></div>
+            
+            <!-- Town Buildings -->
+            <div class="building cafe"></div>
+            <div class="building shop"></div>
+            <div class="building park"></div>
+            <div class="building townhall"></div>
+            <div class="town-square"></div>
+            
+            <!-- Greek Taverna -->
+            <div class="building taverna">
+                <div class="taverna-sign">🍷 Taverna Dimitri</div>
+            </div>
+            
+            <!-- Announcement Board -->
+            <div class="announcement-board">
+                <div class="board-header">📋 Town Jobs</div>
+                <div class="board-content" id="boardContent">
+                    <div class="job-posting">No current emergencies</div>
+                </div>
+            </div>
+            
+            <!-- Player -->
+            <div class="player" id="player">
+                <div class="player-name">You</div>
+            </div>
+        </div>
+
+        <!-- Mobile Joystick -->
+        <div id="mobileJoystick">
+            <div class="joystick-base"></div>
+            <div class="joystick-knob" id="joystickKnob"></div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div id="quickActions">
+            <div class="quick-action" onclick="emote('👋')">👋</div>
+            <div class="quick-action" onclick="emote('😄')">😄</div>
+            <div class="quick-action" onclick="toggleDance()">💃</div>
+        </div>
+
+        <!-- Floating Action Buttons -->
+        <div class="fab-container">
+            <button class="fab" id="menuBtn">☰</button>
+            <button class="fab" id="zoomBtn">🔍</button>
+            <button class="fab primary" id="addPlumberBtn" onclick="addGreekPlumber()">🔧</button>
+        </div>
+
+        <!-- UI Panel -->
+        <div id="uiPanel">
+            <div id="uiPanelHandle"></div>
+            <div id="chatBox"></div>
+            <input type="text" id="chatInput" placeholder="Type a message..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            
+            <div class="button-row">
+                <button class="game-button emote-button" onclick="emote('🎉')">Cheer 🎉</button>
+                <button class="game-button emote-button" onclick="emote('❤️')">Love ❤️</button>
+                <button class="game-button emote-button" onclick="emote('🤔')">Think 🤔</button>
+                <button class="game-button" onclick="addGreekPlumber()" style="background: linear-gradient(45deg, #4169E1, #0000CD);">Add Plumber 🔧</button>
+                <button class="game-button" onclick="removeGreekPlumber()" style="background: linear-gradient(45deg, #DC143C, #8B0000);">Remove Plumber ❌</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html> 
