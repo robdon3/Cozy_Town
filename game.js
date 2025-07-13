@@ -222,25 +222,7 @@ function showMenu() {
 
 // Update camera and viewport
 function updateCamera() {
-    const container = document.getElementById('gameContainer');
-    const containerRect = container.getBoundingClientRect();
-    
-    // Calculate optimal zoom to fit the game world on mobile
-    const scaleX = containerRect.width / 1200;
-    const scaleY = containerRect.height / 800;
-    const optimalZoom = Math.min(scaleX, scaleY, 1); // Don't zoom in beyond 1x
-    
-    // Set initial zoom if not already set
-    if (gameState.camera.zoom === 1 && optimalZoom < 1) {
-        gameState.camera.zoom = optimalZoom;
-        gameState.camera.targetZoom = optimalZoom;
-    }
-    
-    // Center the game world
-    const centerX = (containerRect.width - 1200 * gameState.camera.zoom) / 2;
-    const centerY = (containerRect.height - 800 * gameState.camera.zoom) / 2;
-    
-    elements.gameWorld.style.transform = `translate(${centerX}px, ${centerY}px) scale(${gameState.camera.zoom})`;
+    // No transform/centering needed; gameWorld is now fixed and full screen
 }
 
 // Chat system
