@@ -103,8 +103,8 @@ function setupEventListeners() {
     // UI Panel minimize
     document.getElementById('uiPanelHandle').addEventListener('click', toggleUIPanel);
 
-    // Zoom button
-    document.getElementById('zoomBtn').addEventListener('click', cycleZoom);
+    // Zoom button (disabled for mobile-first design)
+    // document.getElementById('zoomBtn').addEventListener('click', cycleZoom);
 
     // Menu button
     document.getElementById('menuBtn').addEventListener('click', showMenu);
@@ -115,11 +115,11 @@ function setupEventListeners() {
         e.preventDefault();
     }, { passive: false });
 
-    // Handle resize
-    window.addEventListener('resize', updateCamera);
-    window.addEventListener('orientationchange', () => {
-        setTimeout(updateCamera, 100);
-    });
+    // Handle resize (no longer needed with fixed positioning)
+    // window.addEventListener('resize', updateCamera);
+    // window.addEventListener('orientationchange', () => {
+    //     setTimeout(updateCamera, 100);
+    // });
 }
 
 // Mobile joystick controls
@@ -211,10 +211,10 @@ function showMenu() {
     // Simple menu implementation
     const menu = confirm('Menu:\n\n• Instructions\n• Reset Position\n• Clear Chat\n\nWould you like to reset your position?');
     if (menu) {
-        gameState.player.x = 600;
-        gameState.player.y = 500;
-        gameState.player.targetX = 600;
-        gameState.player.targetY = 500;
+        gameState.player.x = 50;
+        gameState.player.y = 60;
+        gameState.player.targetX = 50;
+        gameState.player.targetY = 60;
         updatePlayerPosition();
         addChatMessage('Position reset!', 'System');
     }
@@ -612,11 +612,11 @@ function gameLoop(currentTime) {
     // Update player movement
     updatePlayerMovement(deltaTime);
     
-    // Update camera zoom
-    if (Math.abs(gameState.camera.zoom - gameState.camera.targetZoom) > 0.01) {
-        gameState.camera.zoom += (gameState.camera.targetZoom - gameState.camera.zoom) * 0.1;
-        updateCamera();
-    }
+    // Camera zoom no longer needed with fixed positioning
+    // if (Math.abs(gameState.camera.zoom - gameState.camera.targetZoom) > 0.01) {
+    //     gameState.camera.zoom += (gameState.camera.targetZoom - gameState.camera.zoom) * 0.1;
+    //     updateCamera();
+    // }
     
     // Update Greek plumbers
     updateGreekPlumbers(deltaTime);
