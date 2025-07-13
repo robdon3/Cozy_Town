@@ -10,7 +10,7 @@ const gameState = {
         y: 60,
         targetX: 50,
         targetY: 60,
-        speed: 2,
+        speed: 0.8,
         isDancing: false,
         name: 'You'
     },
@@ -32,12 +32,12 @@ const gameState = {
 
 // Building locations for job system (in percentages)
 const buildings = {
-    cafe: { x: 15, y: 24, name: "Cafe" },
-    shop: { x: 31, y: 30, name: "Shop" },
-    park: { x: 54, y: 24, name: "Park" },
-    townhall: { x: 76, y: 29, name: "Town Hall" },
-    townSquare: { x: 49, y: 62, name: "Town Square" },
-    taverna: { x: 22, y: 51, name: "Taverna Dimitri" }
+    cafe: { x: 11, y: 20, name: "Cafe" },
+    shop: { x: 27, y: 24, name: "Shop" },
+    park: { x: 50, y: 19, name: "Park" },
+    townhall: { x: 72, y: 24, name: "Town Hall" },
+    townSquare: { x: 50, y: 55, name: "Town Square" },
+    taverna: { x: 16, y: 46, name: "Taverna Dimitri" }
 };
 
 // Cache DOM elements
@@ -317,7 +317,7 @@ function createGreekPlumber() {
         lastChatTime: 0,
         isDancing: false,
         danceEndTime: 0,
-        speed: 2 + Math.random(),
+        speed: 0.6 + Math.random() * 0.4,
         state: 'idle', // idle, traveling, working, socializing
         currentJob: null,
         workEndTime: 0
