@@ -2,6 +2,7 @@
   "name": "cozy-town",
   "version": "1.0.0",
   "description": "A mobile web game featuring Greek plumbers who fix pipes and socialize",
+  "homepage": "https://robdon3.github.io/Cozy_Town",
   "main": "index.js",
   "scripts": {
     "start": "react-scripts start",

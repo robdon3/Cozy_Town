@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/Cozy_Town/static/css/main.c309cac8.css",
+    "main.js": "/Cozy_Town/static/js/main.298bd54c.js",
+    "index.html": "/Cozy_Town/index.html",
+    "main.c309cac8.css.map": "/Cozy_Town/static/css/main.c309cac8.css.map",
+    "main.298bd54c.js.map": "/Cozy_Town/static/js/main.298bd54c.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.c309cac8.css",
+    "static/js/main.298bd54c.js"
+  ]
+}
