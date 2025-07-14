@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Heart, MessageCircle, Star, Coins, Settings, Users, Home, ShoppingBag, Coffee, TreePine, Hammer, Fish, Sparkles } from 'lucide-react';
+import { Heart, MessageCircle, Star, Coins, Settings, Users, Home, ShoppingBag, Coffee, TreePine, Hammer, Fish, Sparkles, X } from 'lucide-react';
 
 const CozyTown = () => {
+  // World dimensions - much larger than screen
+  const WORLD_WIDTH = 1600;
+  const WORLD_HEIGHT = 1200;
+  const VIEWPORT_WIDTH = 400;
+  const VIEWPORT_HEIGHT = 300;
+
   const [player, setPlayer] = useState({
     x: 600,
     y: 400,
@@ -16,12 +22,12 @@ const CozyTown = () => {
   });
 
   const [camera, setCamera] = useState({
-    x: 300,
-    y: 200
+    x: 600 - VIEWPORT_WIDTH / 2,
+    y: 400 - VIEWPORT_HEIGHT / 2
   });
 
   // Smooth camera following with interpolation
-  const targetCameraRef = useRef({ x: 300, y: 200 });
+  const targetCameraRef = useRef({ x: 600 - VIEWPORT_WIDTH / 2, y: 400 - VIEWPORT_HEIGHT / 2 });
   const animationFrameRef = useRef(null);
 
   // Camera follows player with smooth movement
@@ -79,7 +85,8 @@ const CozyTown = () => {
     showQuests: false,
     selectedBuilding: null,
     showWelcome: true,
-    showMiniMap: false
+    showMiniMap: false,
+    showSettings: false
   });
 
   const [gameState, setGameState] = useState({
@@ -87,24 +94,28 @@ const CozyTown = () => {
     time: 'day',
     weather: 'sunny',
     activeQuest: null,
-    chatMessages: [],
+    chatMessages: [
+      { id: 1, sender: 'System', message: 'Welcome to Cozy Town! 🌟', timestamp: '12:00' }
+    ],
     onlinePlayers: 47,
-    isMoving: false
+    isMoving: false,
+    soundEnabled: true
   });
 
-  // World dimensions - much larger than screen
-  const WORLD_WIDTH = 1600;
-  const WORLD_HEIGHT = 1200;
-  const VIEWPORT_WIDTH = 400;
-  const VIEWPORT_HEIGHT = 300;
+  // Quest system
+  const [quests] = useState([
+    { id: 1, title: 'First Steps', description: 'Visit the Town Hall', reward: { coins: 50, xp: 20 }, completed: false },
+    { id: 2, title: 'Coffee Break', description: 'Buy coffee at the cafe', reward: { coins: 30, xp: 15 }, completed: false },
+    { id: 3, title: 'Fishing Trip', description: 'Catch a fish at the dock', reward: { coins: 100, xp: 50 }, completed: false }
+  ]);
 
   // NPCs positioned in the larger world
   const [npcs] = useState([
-    { id: 1, name: 'Mayor Jenkins', x: 800, y: 300, emoji: '👨‍💼', dialogue: "Welcome to Cozy Town!" },
-    { id: 2, name: 'Cafe Owner Luna', x: 300, y: 400, emoji: '👩‍🍳', dialogue: "Fresh coffee and treats!" },
-    { id: 3, name: 'Shop Keeper Sam', x: 1200, y: 500, emoji: '🛍️', dialogue: "Come see my wares!" },
-    { id: 4, name: 'Fisher Bob', x: 200, y: 800, emoji: '🎣', dialogue: "The fish are biting today!" },
-    { id: 5, name: 'Woodcutter Alice', x: 1300, y: 200, emoji: '🪓', dialogue: "Need some wood?" }
+    { id: 1, name: 'Mayor Jenkins', x: 800, y: 300, emoji: '👨‍💼', dialogue: "Welcome to Cozy Town! We're always looking for new residents!" },
+    { id: 2, name: 'Cafe Owner Luna', x: 300, y: 400, emoji: '👩‍🍳', dialogue: "Fresh coffee and treats! Come in and relax!" },
+    { id: 3, name: 'Shop Keeper Sam', x: 1200, y: 500, emoji: '🛍️', dialogue: "Come see my wares! I have everything you need!" },
+    { id: 4, name: 'Fisher Bob', x: 200, y: 800, emoji: '🎣', dialogue: "The fish are biting today! Want to try your luck?" },
+    { id: 5, name: 'Woodcutter Alice', x: 1300, y: 200, emoji: '🪓', dialogue: "Need some wood? I can teach you the trade!" }
   ]);
 
   const [otherPlayers] = useState([
@@ -178,6 +189,75 @@ const CozyTown = () => {
       }
     };
   }, [controls, movePlayer]);
+
+  // Keyboard controls for desktop
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      switch(e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          e.preventDefault();
+          setControls(prev => ({ ...prev, up: true }));
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          e.preventDefault();
+          setControls(prev => ({ ...prev, down: true }));
+          break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          e.preventDefault();
+          setControls(prev => ({ ...prev, left: true }));
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          e.preventDefault();
+          setControls(prev => ({ ...prev, right: true }));
+          break;
+        case ' ':
+          e.preventDefault();
+          handleInteract();
+          break;
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      switch(e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          setControls(prev => ({ ...prev, up: false }));
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          setControls(prev => ({ ...prev, down: false }));
+          break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          setControls(prev => ({ ...prev, left: false }));
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          setControls(prev => ({ ...prev, right: false }));
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   // Long-press to walk feature with better mobile handling
   const [longPressTarget, setLongPressTarget] = useState(null);
@@ -326,6 +406,8 @@ const CozyTown = () => {
         energy: Math.max(0, Math.min(100, prev.energy + activity.energy))
       }));
       addChatMessage(activity.message, 'System');
+    } else if (player.energy < Math.abs(activity.energy)) {
+      addChatMessage("You're too tired! Rest at the cafe to restore energy.", 'System');
     }
   };
 
@@ -409,16 +491,51 @@ const CozyTown = () => {
     setUi(prev => ({ ...prev, selectedBuilding: buildingId }));
     
     const interactions = {
-      cafe: () => performActivity('cafe'),
+      cafe: () => {
+        performActivity('cafe');
+        // Check for coffee quest completion
+        const coffeeQuest = quests.find(q => q.title === 'Coffee Break' && !q.completed);
+        if (coffeeQuest) {
+          completeQuest(coffeeQuest.id);
+        }
+      },
       shop: () => setUi(prev => ({ ...prev, showInventory: true })),
-      dock: () => performActivity('fish'),
+      dock: () => {
+        performActivity('fish');
+        // Check for fishing quest completion
+        const fishingQuest = quests.find(q => q.title === 'Fishing Trip' && !q.completed);
+        if (fishingQuest) {
+          completeQuest(fishingQuest.id);
+        }
+      },
       forest: () => performActivity('chop'),
       mine: () => performActivity('mine'),
       park: () => addChatMessage("You enjoy the peaceful park! 🌳", 'System'),
-      townhall: () => setUi(prev => ({ ...prev, showQuests: true }))
+      townhall: () => {
+        setUi(prev => ({ ...prev, showQuests: true }));
+        // Check for town hall quest completion
+        const townHallQuest = quests.find(q => q.title === 'First Steps' && !q.completed);
+        if (townHallQuest) {
+          completeQuest(townHallQuest.id);
+        }
+      }
     };
 
     interactions[buildingId]?.();
+  };
+
+  // Quest completion system
+  const completeQuest = (questId) => {
+    const quest = quests.find(q => q.id === questId);
+    if (quest && !quest.completed) {
+      quest.completed = true;
+      setPlayer(prev => ({
+        ...prev,
+        coins: prev.coins + quest.reward.coins,
+        xp: prev.xp + quest.reward.xp
+      }));
+      addChatMessage(`Quest completed: ${quest.title}! +${quest.reward.coins} coins, +${quest.reward.xp} XP`, 'System');
+    }
   };
 
   // Auto-dismiss welcome banner after movement
@@ -575,8 +692,8 @@ const CozyTown = () => {
 
         {/* Player - always centered in view */}
         <div
-          className={`absolute w-12 h-12 rounded-full bg-blue-200 border-3 border-blue-600 flex items-center justify-center shadow-lg z-20 transition-all duration-100 ${
-            gameState.isMoving ? 'scale-110' : ''
+          className={`absolute w-12 h-12 rounded-full bg-blue-200 border-3 border-blue-600 flex items-center justify-center shadow-lg z-20 transition-all duration-100 animate-float ${
+            gameState.isMoving ? 'scale-110 glow' : ''
           }`}
           style={{ 
             left: player.x - camera.x - 24,
@@ -592,17 +709,37 @@ const CozyTown = () => {
         {/* Long-press target indicator */}
         {longPressTarget && (
           <div
-            className="absolute w-6 h-6 border-2 border-yellow-400 rounded-full bg-yellow-200 opacity-60 animate-pulse pointer-events-none"
+            className="absolute w-6 h-6 border-2 border-yellow-400 rounded-full bg-yellow-200 opacity-60 animate-pulse pointer-events-none glow-gold"
             style={{
               left: longPressTarget.x - camera.x - 12,
               top: longPressTarget.y - camera.y - 12
             }}
           />
         )}
+
+        {/* Particle effects for interactions */}
+        {nearbyInteractables.length > 0 && (
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute w-2 h-2 bg-yellow-400 rounded-full animate-ping opacity-75"
+              style={{
+                left: Math.random() * VIEWPORT_WIDTH,
+                top: Math.random() * VIEWPORT_HEIGHT,
+                animationDelay: '0s'
+              }}
+            />
+            <div className="absolute w-2 h-2 bg-yellow-400 rounded-full animate-ping opacity-75"
+              style={{
+                left: Math.random() * VIEWPORT_WIDTH,
+                top: Math.random() * VIEWPORT_HEIGHT,
+                animationDelay: '1s'
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Top UI Bar */}
-      <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-purple-600 to-blue-600 text-white p-2 flex justify-between items-center text-sm">
+      <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-purple-600 to-blue-600 text-white p-2 flex justify-between items-center text-sm z-30">
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-1">
             <Coins className="w-4 h-4" />
@@ -634,7 +771,7 @@ const CozyTown = () => {
       </div>
 
       {/* Energy Bar */}
-      <div className="absolute left-2 right-2" style={{ top: `${VIEWPORT_HEIGHT + 8}px` }}>
+      <div className="absolute left-2 right-2 z-30" style={{ top: `${VIEWPORT_HEIGHT + 8}px` }}>
         <div className="flex items-center space-x-2">
           <Heart className="w-4 h-4 text-red-500" />
           <div className="flex-1 bg-red-200 rounded-full h-2">
@@ -649,7 +786,7 @@ const CozyTown = () => {
 
       {/* Chat System */}
       {ui.showChat && (
-        <div className="absolute left-2 right-2 bg-black bg-opacity-70 text-white p-2 rounded-lg max-h-20 overflow-y-auto text-xs" style={{ top: `${VIEWPORT_HEIGHT + 32}px` }}>
+        <div className="absolute left-2 right-2 bg-black bg-opacity-70 text-white p-2 rounded-lg max-h-20 overflow-y-auto text-xs z-30" style={{ top: `${VIEWPORT_HEIGHT + 32}px` }}>
           {gameState.chatMessages.map(msg => (
             <div key={msg.id} className="mb-1">
               <span className="font-bold text-blue-300">{msg.sender}:</span> {msg.message}
@@ -659,7 +796,7 @@ const CozyTown = () => {
       )}
 
       {/* Bottom Controls Container */}
-      <div className="absolute bottom-0 left-0 right-0 p-3 flex justify-between items-end">
+      <div className="absolute bottom-0 left-0 right-0 p-3 flex justify-between items-end z-30">
         {/* Interact Button - Context Sensitive */}
         {nearbyInteractables.length > 0 && (
           <div className="flex flex-col items-center">
@@ -747,18 +884,31 @@ const CozyTown = () => {
 
       {/* Welcome Banner */}
       {ui.showWelcome && (
-        <div className="absolute top-16 left-4 right-4 bg-white bg-opacity-90 rounded-lg p-3 shadow-lg">
-          <h2 className="text-lg font-bold text-purple-600 mb-1">Welcome to Cozy Town! 🌟</h2>
-          <p className="text-sm text-gray-700">
-            Use the D-Pad to move or long-press anywhere to walk. Interact with buildings and NPCs to earn coins and XP!
-          </p>
+        <div className="absolute top-16 left-4 right-4 bg-white bg-opacity-90 rounded-lg p-3 shadow-lg z-40">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-lg font-bold text-purple-600 mb-1">Welcome to Cozy Town! 🌟</h2>
+              <p className="text-sm text-gray-700">
+                Use the D-Pad to move or long-press anywhere to walk. Interact with buildings and NPCs to earn coins and XP!
+              </p>
+            </div>
+            <button
+              onClick={() => setUi(prev => ({ ...prev, showWelcome: false }))}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
       {/* Quick Actions Menu */}
       {ui.showMenu && (
-        <div className="absolute top-12 right-2 bg-white rounded-lg shadow-lg p-2 space-y-1">
-          <button className="flex items-center space-x-2 w-full p-2 hover:bg-gray-100 rounded">
+        <div className="absolute top-12 right-2 bg-white rounded-lg shadow-lg p-2 space-y-1 z-40">
+          <button 
+            onClick={() => setUi(prev => ({ ...prev, showInventory: !prev.showInventory, showMenu: false }))}
+            className="flex items-center space-x-2 w-full p-2 hover:bg-gray-100 rounded"
+          >
             <ShoppingBag className="w-4 h-4" />
             <span className="text-sm">Inventory</span>
           </button>
@@ -771,17 +921,83 @@ const CozyTown = () => {
             <span className="text-sm">Friends</span>
           </button>
           <button 
-            onClick={() => setUi(prev => ({ ...prev, showMiniMap: !prev.showMiniMap }))}
+            onClick={() => setUi(prev => ({ ...prev, showMiniMap: !prev.showMiniMap, showMenu: false }))}
             className="flex items-center space-x-2 w-full p-2 hover:bg-gray-100 rounded"
           >
             <span className="text-sm">Mini Map</span>
           </button>
+          <button 
+            onClick={() => setUi(prev => ({ ...prev, showQuests: !prev.showQuests, showMenu: false }))}
+            className="flex items-center space-x-2 w-full p-2 hover:bg-gray-100 rounded"
+          >
+            <span className="text-sm">Quests</span>
+          </button>
+        </div>
+      )}
+
+      {/* Inventory Modal */}
+      {ui.showInventory && (
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-4 max-w-sm w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold">Inventory</h2>
+              <button
+                onClick={() => setUi(prev => ({ ...prev, showInventory: false }))}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {player.inventory.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">Your inventory is empty</p>
+              ) : (
+                player.inventory.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 bg-gray-100 rounded">
+                    <span>{item.name}</span>
+                    <span className="text-sm text-gray-600">x{item.quantity}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quests Modal */}
+      {ui.showQuests && (
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-4 max-w-sm w-full mx-4 max-h-96 overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold">Quests</h2>
+              <button
+                onClick={() => setUi(prev => ({ ...prev, showQuests: false }))}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {quests.map(quest => (
+                <div key={quest.id} className={`p-3 rounded border-2 ${quest.completed ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-300'}`}>
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-semibold">{quest.title}</h3>
+                    {quest.completed && <span className="text-green-600 text-sm">✓ Completed</span>}
+                  </div>
+                  <p className="text-sm text-gray-600 mb-2">{quest.description}</p>
+                  <div className="text-xs text-gray-500">
+                    Reward: {quest.reward.coins} coins, {quest.reward.xp} XP
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
       {/* Mini Map */}
       {ui.showMiniMap && (
-        <div className="absolute top-16 left-2 bg-black bg-opacity-70 rounded-lg p-2 border-2 border-gray-600">
+        <div className="absolute top-16 left-2 bg-black bg-opacity-70 rounded-lg p-2 border-2 border-gray-600 z-40">
           <div className="relative w-32 h-24 bg-green-900">
             {/* Map scale: 1px = 12.5 world units */}
             {buildings.map(building => (
@@ -810,7 +1026,7 @@ const CozyTown = () => {
       )}
 
       {/* Debug Info (remove in production) */}
-      <div className="absolute top-2 left-2 text-xs text-white bg-black bg-opacity-50 p-1 rounded">
+      <div className="absolute top-2 left-2 text-xs text-white bg-black bg-opacity-50 p-1 rounded z-30">
         Pos: {Math.round(player.x)}, {Math.round(player.y)} | Cam: {Math.round(camera.x)}, {Math.round(camera.y)}
       </div>
     </div>
