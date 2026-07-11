@@ -1,12 +1,14 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../game/store';
 import { BUILDINGS, QUESTS, SHOP_ITEMS, WORLD } from '../game/data';
 import Joystick from './Joystick';
 import { sfx, setMuted as setAudioMuted, startMusic, stopMusic } from '../audio/sounds';
+import { roomInviteUrl } from '../game/multiplayer';
 
 function MiniMap() {
   const canvasRef = useRef(null);
   const player = useGameStore((s) => s.player);
+  const remotePlayers = useGameStore((s) => s.remotePlayers);
 
   useEffect(() => {
     const c = canvasRef.current;
@@ -26,11 +28,18 @@ function MiniMap() {
       ctx.fillRect(sx(b.x) - 2, sy(b.z) - 2, 4, 4);
     });
 
+    Object.values(remotePlayers).forEach((p) => {
+      ctx.fillStyle = '#c084fc';
+      ctx.beginPath();
+      ctx.arc(sx(p.x), sy(p.z), 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
     ctx.fillStyle = '#ff5c5c';
     ctx.beginPath();
     ctx.arc(sx(player.x), sy(player.z), 3, 0, Math.PI * 2);
     ctx.fill();
-  }, [player.x, player.z]);
+  }, [player.x, player.z, remotePlayers]);
 
   return (
     <div className="minimap">
@@ -63,6 +72,9 @@ export default function HUD() {
   const completedQuests = useGameStore((s) => s.completedQuests);
   const toast = useGameStore((s) => s.toast);
   const muted = useGameStore((s) => s.muted);
+  const roomCode = useGameStore((s) => s.roomCode);
+  const mpStatus = useGameStore((s) => s.mpStatus);
+  const peerCount = useGameStore((s) => s.peerCount);
   const interact = useGameStore((s) => s.interact);
   const togglePanel = useGameStore((s) => s.togglePanel);
   const closePanels = useGameStore((s) => s.closePanels);
@@ -70,32 +82,42 @@ export default function HUD() {
   const setMutedStore = useGameStore((s) => s.setMuted);
   const resetProgress = useGameStore((s) => s.resetProgress);
   const showToast = useGameStore((s) => s.showToast);
+  const sendChat = useGameStore((s) => s.sendChat);
+  const [chatText, setChatText] = useState('');
 
   const xpNeed = player.level * 100;
   const xpPct = Math.min(100, (player.xp / xpNeed) * 100);
-  const gameUrl =
-    typeof window !== 'undefined'
+
+  const inviteUrl = roomCode
+    ? roomInviteUrl(roomCode)
+    : typeof window !== 'undefined'
       ? window.location.href.split('?')[0]
       : 'https://robdon3.github.io/Cozy_Town/';
 
   const share = async () => {
     sfx.share();
-    const data = {
-      title: 'Cozy Town 3D',
-      text: `Join me in Cozy Town! I'm ${player.name} (Lv.${player.level}). Explore, fish, mine, and hang out 🏡`,
-      url: gameUrl,
-    };
+    const data = roomCode
+      ? {
+          title: 'Join my Cozy Town room!',
+          text: `Play with me in Cozy Town room ${roomCode}! I'm ${player.name} (Lv.${player.level}) 🏡`,
+          url: inviteUrl,
+        }
+      : {
+          title: 'Cozy Town 3D',
+          text: `Join me in Cozy Town! I'm ${player.name} (Lv.${player.level}).`,
+          url: inviteUrl,
+        };
     try {
       if (navigator.share) {
         await navigator.share(data);
         showToast('Thanks for sharing!');
       } else {
         await navigator.clipboard.writeText(`${data.text}\n${data.url}`);
-        showToast('Link copied!');
+        showToast(roomCode ? 'Invite link copied!' : 'Link copied!');
       }
     } catch {
       try {
-        await navigator.clipboard.writeText(gameUrl);
+        await navigator.clipboard.writeText(inviteUrl);
         showToast('Link copied!');
       } catch {
         showToast('Copy failed — select the link');
@@ -111,6 +133,23 @@ export default function HUD() {
     else startMusic();
     sfx.click();
   };
+
+  const submitChat = (e) => {
+    e?.preventDefault?.();
+    if (!chatText.trim()) return;
+    sendChat(chatText);
+    setChatText('');
+    sfx.click();
+  };
+
+  const mpLabel =
+    !roomCode
+      ? null
+      : mpStatus === 'connecting'
+        ? 'Connecting…'
+        : mpStatus === 'live'
+          ? `${peerCount} online`
+          : 'Offline';
 
   return (
     <div className="hud">
@@ -133,10 +172,24 @@ export default function HUD() {
               <div className="energy-fill" style={{ width: `${player.energy}%` }} />
             </div>
           </div>
+          {roomCode && (
+            <div className={`pill mp-pill ${mpStatus}`}>
+              <span className="icon">🟢</span>
+              <span className="room-code">{roomCode}</span>
+              <span className="mp-meta">{mpLabel}</span>
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button className="icon-btn" onClick={share} title="Share with friends">
+          <button className="icon-btn" onClick={share} title="Share invite">
             📤
+          </button>
+          <button
+            className={`icon-btn ${panels.chat ? 'active' : ''}`}
+            onClick={() => togglePanel('chat')}
+            title="Chat"
+          >
+            💬
           </button>
           <button
             className={`icon-btn ${muted ? 'active' : ''}`}
@@ -202,10 +255,27 @@ export default function HUD() {
         </div>
       )}
 
+      {panels.chat && (
+        <form className="chat-compose" onSubmit={submitChat}>
+          <input
+            value={chatText}
+            onChange={(e) => setChatText(e.target.value)}
+            placeholder={roomCode ? 'Say hi to the room…' : 'Local note…'}
+            maxLength={120}
+            autoFocus
+          />
+          <button type="submit" className="btn btn-primary" style={{ flex: '0 0 auto', padding: '10px 14px' }}>
+            Send
+          </button>
+        </form>
+      )}
+
       <div className="hint">
         {nearby
           ? `Near ${nearby.emoji} ${nearby.name} — tap Interact or press E / Space`
-          : 'WASD / joystick to move · E or Space to interact'}
+          : roomCode
+            ? `Room ${roomCode} · invite friends with 📤 · WASD / joystick to move`
+            : 'WASD / joystick to move · E or Space to interact'}
       </div>
 
       <div className="bottom-ui">
@@ -280,14 +350,27 @@ export default function HUD() {
       )}
 
       {panels.share && (
-        <Modal title="Invite friends" onClose={closePanels}>
-          <p>
-            Share this link so friends can play Cozy Town in their browser — no install needed.
-          </p>
-          <div className="share-box">{gameUrl}</div>
+        <Modal title={roomCode ? `Invite to room ${roomCode}` : 'Invite friends'} onClose={closePanels}>
+          {roomCode ? (
+            <p>
+              Send this link — friends open it, pick a name, and hit <strong>Join</strong> to appear in
+              your town (live P2P multiplayer).
+            </p>
+          ) : (
+            <p>
+              You&apos;re in solo mode. Create a multiplayer room from the title screen, or share the
+              game link so friends can play too.
+            </p>
+          )}
+          <div className="share-box">{inviteUrl}</div>
+          {roomCode && (
+            <p style={{ fontSize: 13, marginBottom: 10 }}>
+              Room code: <strong style={{ letterSpacing: '0.15em' }}>{roomCode}</strong>
+            </p>
+          )}
           <div className="btn-row">
             <button className="btn btn-primary" onClick={share}>
-              Share / Copy link
+              Share / Copy invite
             </button>
             <button className="btn btn-secondary" onClick={closePanels}>
               Close
@@ -299,7 +382,22 @@ export default function HUD() {
       {panels.settings && (
         <Modal title="Settings" onClose={closePanels}>
           <p>
-            Playing as <strong>{player.avatar} {player.name}</strong> · Level {player.level}
+            Playing as{' '}
+            <strong>
+              {player.avatar} {player.name}
+            </strong>{' '}
+            · Level {player.level}
+            {roomCode ? (
+              <>
+                <br />
+                Multiplayer room <strong>{roomCode}</strong> · {mpLabel}
+              </>
+            ) : (
+              <>
+                <br />
+                Mode: Solo
+              </>
+            )}
           </p>
           <div className="btn-row">
             <button className="btn btn-secondary" onClick={toggleMute}>

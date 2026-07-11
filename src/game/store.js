@@ -63,35 +63,127 @@ export const useGameStore = create((set, get) => ({
     shop: false,
     share: false,
     settings: false,
+    chat: false,
   },
   nearby: null,
   muted: saved?.muted ?? false,
   toast: null,
   moveInput: { x: 0, z: 0 },
 
+  // multiplayer
+  roomCode: null,
+  mpStatus: 'offline', // offline | connecting | live
+  peerCount: 0,
+  remotePlayers: {}, // peerId -> { name, avatar, x, z, level, color }
+  selfPeerId: null,
+  netSendState: null, // fn set by MultiplayerBridge
+  netSendChat: null,
+
   setMoveInput(x, z) {
     set({ moveInput: { x, z } });
   },
 
-  startGame(name, avatar) {
+  startGame(name, avatar, options = {}) {
     const player = {
       ...get().player,
       name: (name || 'Explorer').slice(0, 16),
       avatar: avatar || AVATARS[0],
     };
-    set({ started: true, player });
-    get().pushMessage('System', `Welcome, ${player.name}! Explore the town.`, true);
+    const roomCode = options.roomCode || null;
+    set({
+      started: true,
+      player,
+      roomCode,
+      mpStatus: roomCode ? 'connecting' : 'offline',
+      peerCount: 0,
+      remotePlayers: {},
+    });
+    if (roomCode) {
+      get().pushMessage(
+        'System',
+        `Joining multiplayer room ${roomCode}… share the invite link with friends!`,
+        true
+      );
+    } else {
+      get().pushMessage('System', `Welcome, ${player.name}! Explore the town (solo).`, true);
+    }
     get().save();
+  },
+
+  setNetHandlers({ sendState, sendChat }) {
+    set({ netSendState: sendState || null, netSendChat: sendChat || null });
+  },
+
+  setMpMeta({ status, peerCount, selfPeerId }) {
+    set((s) => ({
+      mpStatus: status ?? s.mpStatus,
+      peerCount: peerCount ?? s.peerCount,
+      selfPeerId: selfPeerId ?? s.selfPeerId,
+    }));
+  },
+
+  upsertRemotePlayer(peerId, data) {
+    set((s) => ({
+      remotePlayers: {
+        ...s.remotePlayers,
+        [peerId]: {
+          name: 'Friend',
+          avatar: '😊',
+          x: 0,
+          z: 0,
+          level: 1,
+          color: '#F8A5C2',
+          ...s.remotePlayers[peerId],
+          ...data,
+          id: peerId,
+        },
+      },
+    }));
+  },
+
+  removeRemotePlayer(peerId) {
+    set((s) => {
+      const next = { ...s.remotePlayers };
+      delete next[peerId];
+      return { remotePlayers: next };
+    });
+  },
+
+  clearRemotePlayers() {
+    set({ remotePlayers: {}, peerCount: 0 });
   },
 
   setPlayerPos(x, z) {
     set((s) => ({ player: { ...s.player, x, z } }));
   },
 
+  broadcastState(override = null) {
+    const { player, netSendState, roomCode } = get();
+    if (!roomCode || !netSendState) return;
+    netSendState({
+      name: player.name,
+      avatar: player.avatar,
+      x: override?.x ?? player.x,
+      z: override?.z ?? player.z,
+      level: player.level,
+      color: '#6EC6FF',
+    });
+  },
+
+  sendChat(text) {
+    const cleaned = String(text || '').trim().slice(0, 120);
+    if (!cleaned) return;
+    const { player, netSendChat, roomCode } = get();
+    get().pushMessage(player.name, cleaned, false);
+    if (roomCode && netSendChat) {
+      netSendChat({ name: player.name, text: cleaned, avatar: player.avatar });
+    }
+  },
+
   pushMessage(sender, text, system = false) {
     set((s) => ({
       messages: [
-        ...s.messages.slice(-5),
+        ...s.messages.slice(-8),
         { id: Date.now() + Math.random(), sender, text, system },
       ],
     }));
@@ -124,6 +216,7 @@ export const useGameStore = create((set, get) => ({
         shop: false,
         share: false,
         settings: false,
+        chat: false,
       },
     });
   },

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import World from './World';
 import Player from './Player';
+import RemotePlayers from './RemotePlayers';
 import { useGameStore } from './store';
 
 const _desired = new THREE.Vector3();
@@ -33,6 +34,10 @@ function InteractKey() {
   const interact = useGameStore((s) => s.interact);
   useEffect(() => {
     const onKey = (e) => {
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
+        return;
+      }
       if (e.code === 'Space' || e.key === 'e' || e.key === 'E') {
         e.preventDefault();
         interact();
@@ -62,6 +67,7 @@ export default function GameCanvas() {
         <InteractKey />
         <World />
         <Player cameraTarget={cameraTarget} />
+        <RemotePlayers />
       </Suspense>
     </Canvas>
   );

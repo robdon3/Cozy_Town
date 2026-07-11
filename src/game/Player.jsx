@@ -20,6 +20,9 @@ export default function Player({ cameraTarget }) {
   const moveInput = useGameStore((s) => s.moveInput);
   const setPlayerPos = useGameStore((s) => s.setPlayerPos);
   const updateNearby = useGameStore((s) => s.updateNearby);
+  const broadcastState = useGameStore((s) => s.broadcastState);
+  const roomCode = useGameStore((s) => s.roomCode);
+  const netTick = useRef(0);
 
   const tex = useMemo(
     () => createCharacterTexture(player.avatar, '#6EC6FF'),
@@ -34,10 +37,16 @@ export default function Player({ cameraTarget }) {
   const keys = useRef({});
 
   useEffect(() => {
+    const isTyping = (e) => {
+      const t = e.target;
+      return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+    };
     const down = (e) => {
+      if (isTyping(e)) return;
       keys.current[e.key.toLowerCase()] = true;
     };
     const up = (e) => {
+      if (isTyping(e)) return;
       keys.current[e.key.toLowerCase()] = false;
     };
     window.addEventListener('keydown', down);
@@ -106,6 +115,19 @@ export default function Player({ cameraTarget }) {
       posSync.current = 0;
       setPlayerPos(group.current.position.x, group.current.position.z);
       updateNearby(group.current.position.x, group.current.position.z);
+    }
+
+    // multiplayer presence ~8 Hz while moving, slower when idle
+    if (roomCode) {
+      netTick.current += dt;
+      const interval = moving ? 0.12 : 0.45;
+      if (netTick.current >= interval) {
+        netTick.current = 0;
+        const px = group.current.position.x;
+        const pz = group.current.position.z;
+        setPlayerPos(px, pz);
+        broadcastState({ x: px, z: pz });
+      }
     }
 
     // face-ish scale pulse when moving

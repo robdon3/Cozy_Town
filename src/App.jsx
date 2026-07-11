@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import GameCanvas from './game/GameCanvas';
+import MultiplayerBridge from './game/MultiplayerBridge';
 import HUD from './ui/HUD';
 import TitleScreen from './ui/TitleScreen';
 import { useGameStore } from './game/store';
@@ -12,7 +13,6 @@ export default function App() {
 
   useEffect(() => {
     setMuted(muted);
-    // warm audio context on first gesture anywhere after mount
     const warm = () => {
       unlockAudio();
       window.removeEventListener('pointerdown', warm);
@@ -37,6 +37,7 @@ export default function App() {
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       {started ? (
         <>
+          <MultiplayerBridge />
           <GameCanvas />
           <HUD />
         </>
