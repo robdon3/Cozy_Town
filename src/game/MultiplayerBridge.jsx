@@ -72,6 +72,8 @@ export default function MultiplayerBridge() {
           z: Number(data.z) || 0,
           level: Number(data.level) || 1,
           color: data.color || '#F8A5C2',
+          hp: data.hp != null ? Number(data.hp) : undefined,
+          alive: data.alive !== false && (data.hp == null || Number(data.hp) > 0),
         });
         const count = getMultiplayerSession()?.peerCount() ?? 0;
         setMpMeta({ status: 'live', peerCount: count });
@@ -91,6 +93,19 @@ export default function MultiplayerBridge() {
           })
         );
       },
+      onHit: (fromPeerId, data) => {
+        // Only apply if this client is the target
+        const selfId = getSelfId();
+        if (data.targetPeerId && data.targetPeerId !== selfId) return;
+        const remote = useGameStore.getState().remotePlayers[fromPeerId];
+        const fromName =
+          data.fromName || remote?.name || 'Friend';
+        useGameStore.getState().takeDamage(Number(data.damage) || 28, {
+          fromName: String(fromName).slice(0, 16),
+          fromPeerId,
+          kind: data.kind === 'grenade' ? 'grenade' : 'gun',
+        });
+      },
     });
 
     if (!session) {
@@ -103,6 +118,7 @@ export default function MultiplayerBridge() {
       sendState: (state) => session.sendState(state),
       sendChat: (payload) => session.sendChat(payload),
       sendFire: (payload) => session.sendFire(payload),
+      sendHit: (payload) => session.sendHit(payload),
     });
 
     // presence heartbeat (in case peers miss a packet)

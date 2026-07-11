@@ -1,4 +1,4 @@
-import { BUILDINGS, NPCS, PIPE_LEAKS, QUESTS } from './data';
+import { BUILDINGS, PIPE_LEAKS, QUESTS } from './data';
 import { getNpcPos } from './npcRuntime';
 
 function buildingPos(id) {
@@ -9,7 +9,7 @@ function buildingPos(id) {
 /**
  * Resolve the world position for a quest objective.
  */
-export function resolveQuestTarget(quest, { fixedLeaks = [] } = {}) {
+export function resolveQuestTarget(quest, { openLeaks = [] } = {}) {
   if (!quest) return null;
   const key = quest.completeOn;
 
@@ -22,10 +22,13 @@ export function resolveQuestTarget(quest, { fixedLeaks = [] } = {}) {
     const pos = getNpcPos(10);
     return { x: pos.x, z: pos.z, emoji: '🧑‍🔧', label: quest.title };
   }
+  if (key === 'talk-billy') {
+    const pos = getNpcPos(6);
+    return { x: pos.x, z: pos.z, emoji: '♿', label: quest.title };
+  }
   if (key === 'fixpipe' || key === 'fixpipe-all') {
-    const open = PIPE_LEAKS.filter((l) => !fixedLeaks.includes(l.id));
+    const open = PIPE_LEAKS.filter((l) => openLeaks.includes(l.id));
     if (!open.length) return null;
-    // nearest unfinished leak — caller can pass player pos later; pick first open for compass
     const leak = open[0];
     return { x: leak.x, z: leak.z, emoji: leak.emoji, label: quest.title };
   }
@@ -37,11 +40,11 @@ export function getActiveQuest(completedQuests = []) {
   return QUESTS.find((q) => !completedQuests.includes(q.id)) || null;
 }
 
-/** Prefer nearest incomplete fixpipe leak when that is the objective. */
-export function resolveQuestTargetNearPlayer(quest, player, fixedLeaks = []) {
+/** Prefer nearest incomplete open leak when that is the objective. */
+export function resolveQuestTargetNearPlayer(quest, player, openLeaks = []) {
   if (!quest) return null;
   if (quest.completeOn === 'fixpipe' || quest.completeOn === 'fixpipe-all') {
-    const open = PIPE_LEAKS.filter((l) => !fixedLeaks.includes(l.id));
+    const open = PIPE_LEAKS.filter((l) => openLeaks.includes(l.id));
     if (!open.length) return null;
     let best = open[0];
     let bestD = Infinity;
@@ -58,5 +61,9 @@ export function resolveQuestTargetNearPlayer(quest, player, fixedLeaks = []) {
     const pos = getNpcPos(10);
     return { x: pos.x, z: pos.z, emoji: '🧑‍🔧', label: quest.title };
   }
-  return resolveQuestTarget(quest, { fixedLeaks });
+  if (quest.completeOn === 'talk-billy') {
+    const pos = getNpcPos(6);
+    return { x: pos.x, z: pos.z, emoji: '♿', label: quest.title };
+  }
+  return resolveQuestTarget(quest, { openLeaks });
 }

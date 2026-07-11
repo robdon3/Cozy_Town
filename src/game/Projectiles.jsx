@@ -16,7 +16,7 @@ function pushProjectile(list, p) {
 }
 
 /**
- * Bullets + grenades (local + remote multiplayer).
+ * Bullets + grenades (local + remote multiplayer) with arcade player damage.
  */
 export default function Projectiles() {
   const group = useRef();
@@ -26,6 +26,18 @@ export default function Projectiles() {
   const onNpcHit = useGameStore((s) => s.onNpcHit);
   const showToast = useGameStore((s) => s.showToast);
   const hitCooldown = useRef(new Map());
+  const fireCd = useRef(0);
+
+  // Hold-to-fire (works while moving — separate touch points)
+  useFrame((_, dt) => {
+    fireCd.current = Math.max(0, fireCd.current - dt);
+    const st = useGameStore.getState();
+    if (!st.fireHeld || st.interiorId || st.player.hp <= 0) return;
+    if (fireCd.current > 0) return;
+    const w = st.equippedWeapon === 'grenade' ? WEAPONS.grenade : WEAPONS.gun;
+    fireCd.current = w.cooldown;
+    st.tryFire();
+  });
 
   // Local fire
   useEffect(() => {
@@ -54,8 +66,8 @@ export default function Projectiles() {
         trail: [],
         color: '#ffe566',
         remote: false,
+        fromName: player.name,
       });
-      // broadcast to multiplayer peers
       const send = useGameStore.getState().netSendFire;
       if (send) {
         send({
@@ -66,6 +78,7 @@ export default function Projectiles() {
           vx: forwardX * speed,
           vy: 0.15,
           vz: forwardZ * speed,
+          fromName: player.name,
         });
       }
     } else if (fireRequest.kind === 'grenade') {
@@ -83,6 +96,7 @@ export default function Projectiles() {
         fuse: WEAPONS.grenade.fuse,
         trail: [],
         remote: false,
+        fromName: player.name,
       });
       const send = useGameStore.getState().netSendFire;
       if (send) {
@@ -94,6 +108,7 @@ export default function Projectiles() {
           vx: forwardX * speed,
           vy: 9,
           vz: forwardZ * speed,
+          fromName: player.name,
         });
       }
     }
@@ -119,6 +134,7 @@ export default function Projectiles() {
           trail: [],
           color: '#ff7ad9',
           remote: true,
+          fromName: d.fromName || 'Friend',
         });
         sfx.gunshot();
       } else if (d.kind === 'grenade') {
@@ -135,6 +151,7 @@ export default function Projectiles() {
           fuse: WEAPONS.grenade.fuse,
           trail: [],
           remote: true,
+          fromName: d.fromName || 'Friend',
         });
         sfx.grenadeThrow();
       }
@@ -157,6 +174,12 @@ export default function Projectiles() {
 
     const next = [];
     const bound = WORLD.half - 1;
+    const st = useGameStore.getState();
+    // no projectiles processed indoors
+    if (st.interiorId) {
+      list.current = [];
+      return;
+    }
 
     for (const p of list.current) {
       if (p.kind === 'gun') {
@@ -169,25 +192,51 @@ export default function Projectiles() {
         p.z += p.vz * dt;
         p.life -= dt;
 
+        let hitSomething = false;
+
         if (!p.remote) {
+          // Hit NPCs (fun reaction only)
           for (const npc of NPCS) {
             const pos = getNpcPos(npc.id);
             const d = Math.hypot(p.x - pos.x, p.z - pos.z);
-            if (d < 1.4 && p.y < 2.8) {
-              const last = hitCooldown.current.get(npc.id) || 0;
+            if (d < WEAPONS.gun.hitRadius && p.y < 2.8) {
+              const last = hitCooldown.current.get(`npc-${npc.id}`) || 0;
               if (Date.now() - last > 750) {
-                hitCooldown.current.set(npc.id, Date.now());
+                hitCooldown.current.set(`npc-${npc.id}`, Date.now());
                 onNpcHit(npc.id);
                 sfx.hit();
               }
-              p.life = 0;
+              hitSomething = true;
               break;
             }
           }
+          // Hit remote players → arcade damage
+          if (!hitSomething) {
+            for (const [peerId, remote] of Object.entries(st.remotePlayers)) {
+              if (remote.alive === false || (remote.hp ?? 1) <= 0) continue;
+              const d = Math.hypot(p.x - remote.x, p.z - remote.z);
+              if (d < WEAPONS.gun.hitRadius && p.y < 2.8) {
+                const key = `peer-${peerId}`;
+                const last = hitCooldown.current.get(key) || 0;
+                if (Date.now() - last > 200) {
+                  hitCooldown.current.set(key, Date.now());
+                  st.reportHitOnPeer(peerId, WEAPONS.gun.damage, 'gun');
+                  sfx.hit();
+                }
+                hitSomething = true;
+                break;
+              }
+            }
+          }
+        } else {
+          // Remote bullets are visual; damage arrives via hit packet (avoids double-damage)
+        }
+
+        if (hitSomething) {
+          p.life = 0;
         }
 
         if (p.life > 0 && Math.abs(p.x) < bound && Math.abs(p.z) < bound && p.y > 0) {
-          // tracer streak
           if (p.trail.length > 1) {
             const pts = p.trail.map((t) => new THREE.Vector3(t.x, t.y, t.z));
             const geo = new THREE.BufferGeometry().setFromPoints(pts);
@@ -201,14 +250,12 @@ export default function Projectiles() {
             );
             group.current.add(line);
           }
-          // bright bolt
           const mesh = new THREE.Mesh(
             new THREE.SphereGeometry(0.22, 10, 10),
             new THREE.MeshBasicMaterial({ color: p.color || '#ffe566' })
           );
           mesh.position.set(p.x, p.y, p.z);
           group.current.add(mesh);
-          // glow shell
           const glow = new THREE.Mesh(
             new THREE.SphereGeometry(0.4, 10, 10),
             new THREE.MeshBasicMaterial({
@@ -243,14 +290,24 @@ export default function Projectiles() {
           sfx.explosion();
           if (!p.remote) showToast('💥 Boom!');
           emitBoom(p.x, p.y, p.z);
+          const radius = WEAPONS.grenade.radius;
+          const dmg = WEAPONS.grenade.damage;
+
           if (!p.remote) {
             for (const npc of NPCS) {
               const pos = getNpcPos(npc.id);
-              if (Math.hypot(p.x - pos.x, p.z - pos.z) < WEAPONS.grenade.radius) {
+              if (Math.hypot(p.x - pos.x, p.z - pos.z) < radius) {
                 onNpcHit(npc.id);
               }
             }
+            for (const [peerId, remote] of Object.entries(st.remotePlayers)) {
+              if (remote.alive === false) continue;
+              if (Math.hypot(p.x - remote.x, p.z - remote.z) < radius) {
+                st.reportHitOnPeer(peerId, dmg, 'grenade');
+              }
+            }
           }
+          // Remote grenade damage arrives via hit packet from the thrower
         } else if (p.life > 0) {
           const blink = Math.sin(p.fuse * 20) > 0;
           const body = new THREE.Mesh(
@@ -265,7 +322,6 @@ export default function Projectiles() {
           body.position.set(p.x, p.y, p.z);
           body.rotation.y = p.spin;
           group.current.add(body);
-          // danger ring on ground
           const ring = new THREE.Mesh(
             new THREE.RingGeometry(0.5, 0.7, 24),
             new THREE.MeshBasicMaterial({

@@ -9,7 +9,7 @@ import { lookState } from '../game/lookState';
 export default function QuestCompass() {
   const player = useGameStore((s) => s.player);
   const completedQuests = useGameStore((s) => s.completedQuests);
-  const fixedLeaks = useGameStore((s) => s.fixedLeaks);
+  const openLeaks = useGameStore((s) => s.openLeaks);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -21,7 +21,7 @@ export default function QuestCompass() {
   // Free up screen when done
   if (!quest) return null;
 
-  const target = resolveQuestTargetNearPlayer(quest, player, fixedLeaks);
+  const target = resolveQuestTargetNearPlayer(quest, player, openLeaks);
   void tick;
 
   if (!target) {

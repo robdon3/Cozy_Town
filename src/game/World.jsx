@@ -7,11 +7,14 @@ import {
   getNpcBob,
   getNpcPos,
   initFromData,
+  isNpcFixing,
   isNpcWalking,
+  setOpenLeaksSnapshot,
   tickNpcs,
 } from './npcRuntime';
 import { createCharacterTexture, createEmojiTexture, createLabelTexture } from './sprites';
 import { useGameStore } from './store';
+import Interior from './Interior';
 
 function Ground() {
   const grass = useMemo(() => {
@@ -184,40 +187,84 @@ function NpcSprite({ npc }) {
     () => createCharacterTexture(npc.emoji, npc.color),
     [npc.emoji, npc.color]
   );
-  const labelText = npc.role === 'plumber' ? `🔧 ${npc.name}` : npc.name;
+  const labelText = npc.wheelchair
+    ? `♿ ${npc.name}`
+    : npc.role === 'plumber'
+      ? `🔧 ${npc.name}`
+      : npc.name;
   const label = useMemo(() => createLabelTexture(labelText), [labelText]);
   const titleTex = useMemo(
     () => (npc.title ? createLabelTexture(npc.title, 'rgba(40,70,120,0.88)') : null),
     [npc.title]
   );
-  const canRoam = npc.role === 'plumber';
+  const canRoam = npc.role === 'plumber' || npc.role === 'billy' || npc.wheelchair;
+  const chairTex = useMemo(
+    () => (npc.wheelchair ? createEmojiTexture('♿', 96) : null),
+    [npc.wheelchair]
+  );
 
   useFrame(() => {
     if (!group.current) return;
     const { x, z } = getNpcPos(npc.id);
     const bob = getNpcBob(npc.id);
     const walking = isNpcWalking(npc.id);
-    const y = walking ? Math.abs(Math.sin(bob)) * 0.14 : Math.sin(bob) * 0.03;
+    const fixing = isNpcFixing(npc.id);
+    // wheelchair: low smooth roll; standing: walk bob
+    let y = 0;
+    if (npc.wheelchair) {
+      y = walking ? Math.abs(Math.sin(bob)) * 0.04 : 0;
+    } else {
+      y = walking ? Math.abs(Math.sin(bob)) * 0.14 : Math.sin(bob) * 0.03;
+      if (fixing) y = Math.abs(Math.sin(bob * 1.5)) * 0.1;
+    }
     group.current.position.set(x, y, z);
-    // subtle scale bounce while walking
     const sc = walking ? 1 + Math.sin(bob) * 0.04 : 1;
     group.current.scale.setScalar(sc);
   });
 
   return (
     <group ref={group} position={[npc.x, 0, npc.z]}>
-      <Billboard position={[0, 1.15, 0]} follow lockX={false} lockZ={false}>
+      {npc.wheelchair && (
+        <>
+          {/* chair frame */}
+          <mesh position={[0, 0.35, 0]} castShadow>
+            <boxGeometry args={[0.85, 0.12, 0.95]} />
+            <meshStandardMaterial color="#3a6ea5" metalness={0.35} roughness={0.45} />
+          </mesh>
+          <mesh position={[0, 0.7, -0.15]} castShadow>
+            <boxGeometry args={[0.75, 0.7, 0.12]} />
+            <meshStandardMaterial color="#2c5282" />
+          </mesh>
+          {/* wheels */}
+          <mesh position={[-0.45, 0.28, 0.05]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.28, 0.28, 0.1, 12]} />
+            <meshStandardMaterial color="#1a1a1a" />
+          </mesh>
+          <mesh position={[0.45, 0.28, 0.05]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.28, 0.28, 0.1, 12]} />
+            <meshStandardMaterial color="#1a1a1a" />
+          </mesh>
+          {chairTex && (
+            <Billboard position={[0.55, 0.9, 0]}>
+              <sprite scale={[0.55, 0.55, 1]}>
+                <spriteMaterial map={chairTex} transparent depthWrite={false} />
+              </sprite>
+            </Billboard>
+          )}
+        </>
+      )}
+      <Billboard position={[0, npc.wheelchair ? 1.35 : 1.15, 0]} follow lockX={false} lockZ={false}>
         <sprite scale={[1.8, 1.8, 1]}>
           <spriteMaterial map={tex} transparent depthWrite={false} />
         </sprite>
       </Billboard>
-      <Billboard position={[0, 2.4, 0]}>
+      <Billboard position={[0, npc.wheelchair ? 2.55 : 2.4, 0]}>
         <sprite scale={[canRoam ? 3.0 : 2.4, 0.6, 1]}>
           <spriteMaterial map={label} transparent depthWrite={false} />
         </sprite>
       </Billboard>
       {titleTex && (
-        <Billboard position={[0, 2.95, 0]}>
+        <Billboard position={[0, npc.wheelchair ? 3.1 : 2.95, 0]}>
           <sprite scale={[2.2, 0.5, 1]}>
             <spriteMaterial map={titleTex} transparent depthWrite={false} />
           </sprite>
@@ -231,14 +278,22 @@ function NpcSprite({ npc }) {
   );
 }
 
-/** Single frame tick for all roaming NPCs */
+/** Single frame tick for roaming NPCs + leak AI + respawns */
 function NpcDirector() {
   useEffect(() => {
     initFromData();
   }, []);
 
   useFrame((_, dt) => {
-    tickNpcs(dt);
+    const st = useGameStore.getState();
+    if (st.interiorId) return;
+    setOpenLeaksSnapshot(st.openLeaks);
+    st.tickLeaks();
+    tickNpcs(dt, {
+      onNpcFixLeak: (leakId) => {
+        useGameStore.getState().sealLeak(leakId, { by: 'npc' });
+      },
+    });
   });
 
   return null;
@@ -338,30 +393,37 @@ function Fountain() {
 }
 
 function PipeLeak({ leak }) {
-  const fixedLeaks = useGameStore((s) => s.fixedLeaks);
-  const fixed = fixedLeaks.includes(leak.id);
+  const openLeaks = useGameStore((s) => s.openLeaks);
+  const open = openLeaks.includes(leak.id);
   const bob = useRef(0);
   const group = useRef();
-  const dripTex = useMemo(() => createEmojiTexture(fixed ? '✅' : leak.emoji), [fixed, leak.emoji]);
+  const dripTex = useMemo(
+    () => createEmojiTexture(open ? leak.emoji : '✅'),
+    [open, leak.emoji]
+  );
   const label = useMemo(
-    () => createLabelTexture(fixed ? `${leak.name} (fixed)` : `${leak.emoji} ${leak.name}`),
-    [fixed, leak.emoji, leak.name]
+    () =>
+      createLabelTexture(open ? `${leak.emoji} ${leak.name}` : `${leak.name} (sealed)`),
+    [open, leak.emoji, leak.name]
   );
 
   useFrame((_, dt) => {
-    if (!group.current || fixed) return;
+    if (!group.current || !open) return;
     bob.current += dt * 4;
     group.current.position.y = 0.9 + Math.sin(bob.current) * 0.12;
   });
 
   return (
     <group position={[leak.x, 0, leak.z]}>
-      {/* pipe stub */}
       <mesh position={[0, 0.35, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
         <cylinderGeometry args={[0.18, 0.18, 1.2, 8]} />
-        <meshStandardMaterial color={fixed ? '#6a8f6a' : '#8a8a96'} metalness={0.4} roughness={0.45} />
+        <meshStandardMaterial
+          color={open ? '#8a8a96' : '#6a8f6a'}
+          metalness={0.4}
+          roughness={0.45}
+        />
       </mesh>
-      {!fixed && (
+      {open && (
         <mesh position={[0.5, 0.15, 0]}>
           <sphereGeometry args={[0.2, 10, 10]} />
           <meshStandardMaterial
@@ -401,6 +463,17 @@ function Flower({ position, emoji }) {
 }
 
 export default function World() {
+  const interiorId = useGameStore((s) => s.interiorId);
+
+  if (interiorId) {
+    return (
+      <group>
+        <Interior buildingId={interiorId} />
+        <NpcDirector />
+      </group>
+    );
+  }
+
   return (
     <group>
       <color attach="background" args={['#87CEEB']} />
@@ -437,7 +510,6 @@ export default function World() {
         <PipeLeak key={leak.id} leak={leak} />
       ))}
 
-      {/* town square fountain */}
       <Fountain />
     </group>
   );

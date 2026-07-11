@@ -8,7 +8,7 @@ export default function MiniMap() {
   const canvasRef = useRef(null);
   const player = useGameStore((s) => s.player);
   const remotePlayers = useGameStore((s) => s.remotePlayers);
-  const fixedLeaks = useGameStore((s) => s.fixedLeaks);
+  const openLeaks = useGameStore((s) => s.openLeaks);
 
   useEffect(() => {
     let raf = 0;
@@ -58,17 +58,17 @@ export default function MiniMap() {
 
       // leaks
       PIPE_LEAKS.forEach((leak) => {
-        if (fixedLeaks.includes(leak.id)) {
+        if (!openLeaks.includes(leak.id)) {
           drawIcon('✅', sx(leak.x), sy(leak.z), 9);
         } else {
           drawIcon(leak.emoji, sx(leak.x), sy(leak.z), 10);
         }
       });
 
-      // plumbers
-      NPCS.filter((n) => n.role === 'plumber').forEach((n) => {
+      // plumbers + billy
+      NPCS.filter((n) => n.role === 'plumber' || n.wheelchair).forEach((n) => {
         const pos = getNpcPos(n.id);
-        drawIcon('🔧', sx(pos.x), sy(pos.z), 9);
+        drawIcon(n.wheelchair ? '♿' : '🔧', sx(pos.x), sy(pos.z), 9);
       });
 
       // friends
@@ -99,7 +99,7 @@ export default function MiniMap() {
       alive = false;
       cancelAnimationFrame(raf);
     };
-  }, [fixedLeaks]);
+  }, [openLeaks]);
 
   return (
     <div className="minimap" title="Map · 🔴 you · icons = places">

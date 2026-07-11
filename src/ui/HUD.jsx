@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../game/store';
-import { PIPE_LEAKS, QUESTS, SHOP_ITEMS } from '../game/data';
+import { PERSONAL_FIXES_FOR_MASTER, PLAYER_MAX_HP, PIPE_LEAKS, QUESTS, SHOP_ITEMS } from '../game/data';
 import Joystick from './Joystick';
 import LookStick from './LookStick';
 import MiniMap from './MiniMap';
@@ -45,8 +45,10 @@ export default function HUD() {
   const sendChat = useGameStore((s) => s.sendChat);
   const equippedWeapon = useGameStore((s) => s.equippedWeapon);
   const setEquippedWeapon = useGameStore((s) => s.setEquippedWeapon);
-  const tryFire = useGameStore((s) => s.tryFire);
-  const fixedLeaks = useGameStore((s) => s.fixedLeaks);
+  const setFireHeld = useGameStore((s) => s.setFireHeld);
+  const openLeaks = useGameStore((s) => s.openLeaks);
+  const personalFixes = useGameStore((s) => s.personalFixes);
+  const interiorId = useGameStore((s) => s.interiorId);
   const [chatText, setChatText] = useState('');
   const [chatExpanded, setChatExpanded] = useState(false);
   const [flashVisible, setFlashVisible] = useState(false);
@@ -109,7 +111,8 @@ export default function HUD() {
 
   const xpNeed = player.level * 100;
   const xpPct = Math.min(100, (player.xp / xpNeed) * 100);
-  const leaksLeft = PIPE_LEAKS.length - fixedLeaks.length;
+  const leaksOpen = openLeaks.length;
+  const hpPct = Math.max(0, Math.min(100, ((player.hp ?? PLAYER_MAX_HP) / PLAYER_MAX_HP) * 100));
 
   const inviteUrl = roomCode
     ? roomInviteUrl(roomCode)
@@ -191,8 +194,23 @@ export default function HUD() {
                 <div className="xp-fill" style={{ width: `${xpPct}%` }} />
               </div>
             </div>
-            <div className="pill">
+            <div className="pill" title="Health">
               <span className="icon">❤️</span>
+              <div className="energy-track">
+                <div
+                  className="energy-fill hp-fill"
+                  style={{
+                    width: `${hpPct}%`,
+                    background:
+                      hpPct < 35
+                        ? 'linear-gradient(90deg,#ff5c5c,#c23b22)'
+                        : 'linear-gradient(90deg,#ff8a8a,#e85d5d)',
+                  }}
+                />
+              </div>
+            </div>
+            <div className="pill" title="Energy">
+              <span className="icon">⚡</span>
               <div className="energy-track">
                 <div className="energy-fill" style={{ width: `${player.energy}%` }} />
               </div>
@@ -233,7 +251,7 @@ export default function HUD() {
           </div>
         </div>
 
-        {(roomCode || leaksLeft > 0) && (
+        {(roomCode || leaksOpen > 0 || personalFixes > 0 || interiorId) && (
           <div className="hud-chips">
             {roomCode && (
               <div className={`chip mp-chip ${mpStatus}`}>
@@ -242,11 +260,19 @@ export default function HUD() {
                 {mpLabel && <span className="mp-meta">{mpLabel}</span>}
               </div>
             )}
-            {leaksLeft > 0 && (
-              <div className="chip" title="Leaks left">
-                💧 {leaksLeft}
+            {interiorId && (
+              <div className="chip" title="Indoors">
+                🏠 Inside
               </div>
             )}
+            {leaksOpen > 0 && (
+              <div className="chip" title="Active leaks in town">
+                💧 {leaksOpen}/{PIPE_LEAKS.length}
+              </div>
+            )}
+            <div className="chip" title="Your personal pipe fixes (quests)">
+              🔧 You: {personalFixes}/{PERSONAL_FIXES_FOR_MASTER}
+            </div>
           </div>
         )}
 
@@ -356,8 +382,12 @@ export default function HUD() {
         <div className={`hint ${nearby ? 'nearby' : 'controls'}`}>
           {nearby
             ? `${nearby.emoji} ${nearby.name} — ${nearby.action}`
-            : 'LOOK · move stick · FIRE · Space interact'}
+            : 'MOVE left · LOOK right · hold FIRE · Space interact'}
         </div>
+      )}
+
+      {player.hp <= 0 && (
+        <div className="death-banner">💀 Eliminated — respawning…</div>
       )}
 
       <div className="bottom-zone">
@@ -380,14 +410,30 @@ export default function HUD() {
             <span>💣</span>
             <small>{player.grenades ?? 0}</small>
           </button>
-          <button type="button" className="fire-btn" onClick={() => tryFire()}>
+          <button
+            type="button"
+            className="fire-btn"
+            disabled={Boolean(interiorId) || player.hp <= 0}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.currentTarget.setPointerCapture?.(e.pointerId);
+              setFireHeld(true);
+            }}
+            onPointerUp={() => setFireHeld(false)}
+            onPointerCancel={() => setFireHeld(false)}
+            onLostPointerCapture={() => setFireHeld(false)}
+            title="Hold FIRE while using MOVE stick"
+          >
             FIRE
           </button>
         </div>
 
+        {/* Normal controller layout: MOVE left, LOOK right */}
         <div className="bottom-ui">
           <div className="bottom-left">
-            <LookStick />
+            <div className="stick-label">MOVE</div>
+            <Joystick />
             {nearby && (
               <button className="interact-btn" onClick={() => interact()}>
                 <span className="emoji">{nearby.emoji}</span>
@@ -395,7 +441,9 @@ export default function HUD() {
               </button>
             )}
           </div>
-          <Joystick />
+          <div className="bottom-right">
+            <LookStick />
+          </div>
         </div>
       </div>
 
@@ -404,15 +452,25 @@ export default function HUD() {
       {panels.quests && (
         <Modal title="Quests" onClose={closePanels}>
           <p>Complete activities around town to earn coins and XP.</p>
+          <p style={{ fontSize: 13, color: 'var(--muted)' }}>
+            Personal pipe fixes: <strong>{personalFixes}</strong> (NPC seals don’t count)
+          </p>
           {QUESTS.map((q) => {
             const done = completedQuests.includes(q.id);
+            let progress = '';
+            if (q.completeOn === 'fixpipe-all' && !done) {
+              progress = ` · ${personalFixes}/${PERSONAL_FIXES_FOR_MASTER}`;
+            }
             return (
               <div key={q.id} className={`quest-card ${done ? 'done' : ''}`}>
                 <h3>
                   {q.title}
                   {done && <span className="done-tag">✓ Done</span>}
                 </h3>
-                <div style={{ fontSize: 13, color: 'var(--muted)' }}>{q.description}</div>
+                <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+                  {q.description}
+                  {progress}
+                </div>
                 <div className="reward">
                   Reward: {q.reward.coins} coins · {q.reward.xp} XP
                 </div>

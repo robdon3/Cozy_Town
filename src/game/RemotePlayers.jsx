@@ -14,10 +14,15 @@ function RemotePlayer({ peer }) {
     () => createCharacterTexture(peer.avatar, peer.color || '#F8A5C2'),
     [peer.avatar, peer.color]
   );
-  const label = useMemo(
-    () => createLabelTexture(`${peer.name} · Lv.${peer.level || 1}`, 'rgba(90,40,70,0.88)'),
-    [peer.name, peer.level]
-  );
+  const label = useMemo(() => {
+    const dead = peer.alive === false || (peer.hp != null && peer.hp <= 0);
+    const hpBit = peer.hp != null && !dead ? ` ❤️${Math.ceil(peer.hp)}` : '';
+    const tag = dead ? ' 💀' : '';
+    return createLabelTexture(
+      `${peer.name} · Lv.${peer.level || 1}${hpBit}${tag}`,
+      dead ? 'rgba(40,20,20,0.9)' : 'rgba(90,40,70,0.88)'
+    );
+  }, [peer.name, peer.level, peer.hp, peer.alive]);
 
   // keep target in sync when peer state updates
   target.current.set(peer.x, 0, peer.z);
@@ -46,11 +51,19 @@ function RemotePlayer({ peer }) {
     }
   });
 
+  const dead = peer.alive === false || (peer.hp != null && peer.hp <= 0);
+
   return (
     <group ref={group} position={[peer.x, 0, peer.z]}>
-      <Billboard position={[0, 1.2, 0]} follow>
+      <Billboard position={[0, dead ? 0.7 : 1.2, 0]} follow>
         <sprite scale={[1.85, 1.85, 1]}>
-          <spriteMaterial map={tex} transparent depthWrite={false} />
+          <spriteMaterial
+            map={tex}
+            transparent
+            depthWrite={false}
+            opacity={dead ? 0.4 : 1}
+            color={dead ? '#888888' : '#ffffff'}
+          />
         </sprite>
       </Billboard>
       <Billboard position={[0, 2.5, 0]}>
@@ -68,7 +81,10 @@ function RemotePlayer({ peer }) {
 
 export default function RemotePlayers() {
   const remotePlayers = useGameStore((s) => s.remotePlayers);
+  const interiorId = useGameStore((s) => s.interiorId);
   const list = useMemo(() => Object.values(remotePlayers), [remotePlayers]);
+
+  if (interiorId) return null;
 
   return (
     <group>

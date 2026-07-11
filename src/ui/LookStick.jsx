@@ -3,7 +3,7 @@ import { useGameStore } from '../game/store';
 
 const MAX = 36;
 
-/** Virtual look pad (mobile) — top-left */
+/** Virtual look pad — right side (normal dual-stick layout) */
 export default function LookStick() {
   const baseRef = useRef(null);
   const knobRef = useRef(null);

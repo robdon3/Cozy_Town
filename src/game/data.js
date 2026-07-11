@@ -5,6 +5,8 @@ export const WORLD = {
   half: 40,
 };
 
+export const PLAYER_MAX_HP = 100;
+
 export const BUILDINGS = [
   {
     id: 'cafe',
@@ -17,8 +19,9 @@ export const BUILDINGS = [
     color: '#8B5A2B',
     roof: '#5C3317',
     emoji: '☕',
-    action: 'Buy Coffee',
+    action: 'Enter Cafe',
     activity: 'cafe',
+    enterable: true,
   },
   {
     id: 'shop',
@@ -31,8 +34,9 @@ export const BUILDINGS = [
     color: '#E85D5D',
     roof: '#9B2C2C',
     emoji: '🏪',
-    action: 'Browse Shop',
+    action: 'Enter Shop',
     activity: 'shop',
+    enterable: true,
   },
   {
     id: 'park',
@@ -60,8 +64,9 @@ export const BUILDINGS = [
     color: '#5BA3C9',
     roof: '#2C6B8A',
     emoji: '🏛️',
-    action: 'View Quests',
+    action: 'Enter Hall',
     activity: 'townhall',
+    enterable: true,
   },
   {
     id: 'dock',
@@ -104,8 +109,9 @@ export const BUILDINGS = [
     color: '#6B6B7A',
     roof: '#3F3F4A',
     emoji: '⛏️',
-    action: 'Mine Ore',
+    action: 'Enter Mine',
     activity: 'mine',
+    enterable: true,
   },
   {
     id: 'plumbhq',
@@ -118,12 +124,138 @@ export const BUILDINGS = [
     color: '#4A6FA5',
     roof: '#2C4060',
     emoji: '🔧',
-    action: 'Visit Crew',
+    action: 'Enter HQ',
     activity: 'plumbhq',
+    enterable: true,
   },
 ];
 
-/** Town locals + the Greek plumber crew */
+/**
+ * Pokémon-style indoor rooms. Local coords: door/exit near +z, spawn just inside.
+ */
+export const INTERIORS = {
+  cafe: {
+    name: 'Cozy Cafe',
+    emoji: '☕',
+    w: 14,
+    d: 12,
+    floor: '#d4b896',
+    wall: '#6b3f24',
+    accent: '#c4783a',
+    spawn: { x: 0, z: 4.2 },
+    exitZ: 5.2,
+    props: [
+      { type: 'counter', x: 0, z: -3.5, w: 6, d: 1.2, h: 1.1, color: '#5c3a22' },
+      { type: 'table', x: -4, z: 0, color: '#8B5A2B' },
+      { type: 'table', x: 4, z: 0, color: '#8B5A2B' },
+      { type: 'table', x: -3, z: 2.5, color: '#8B5A2B' },
+      { type: 'plant', x: 5.5, z: -4 },
+      { type: 'plant', x: -5.5, z: -4 },
+      { type: 'rug', x: 0, z: 1, w: 4, d: 3, color: '#c45c5c' },
+    ],
+    interactables: [
+      { id: 'cafe-counter', name: 'Coffee Counter', emoji: '☕', x: 0, z: -2.8, action: 'Buy Coffee', activity: 'cafe' },
+    ],
+  },
+  shop: {
+    name: 'General Store',
+    emoji: '🏪',
+    w: 15,
+    d: 13,
+    floor: '#c9b8a0',
+    wall: '#a83c3c',
+    accent: '#e85d5d',
+    spawn: { x: 0, z: 4.6 },
+    exitZ: 5.6,
+    props: [
+      { type: 'counter', x: 0, z: -4, w: 7, d: 1.4, h: 1.15, color: '#5a3a2a' },
+      { type: 'shelf', x: -5.5, z: -1, h: 2.4 },
+      { type: 'shelf', x: 5.5, z: -1, h: 2.4 },
+      { type: 'shelf', x: -5.5, z: 2, h: 2.4 },
+      { type: 'crate', x: 4, z: 2 },
+      { type: 'crate', x: -3.5, z: 2.5 },
+    ],
+    interactables: [
+      { id: 'shop-counter', name: 'Shop Counter', emoji: '🛒', x: 0, z: -3.2, action: 'Browse Shop', activity: 'shop' },
+    ],
+  },
+  townhall: {
+    name: 'Town Hall',
+    emoji: '🏛️',
+    w: 16,
+    d: 14,
+    floor: '#d8cfc0',
+    wall: '#3d6f8c',
+    accent: '#5BA3C9',
+    spawn: { x: 0, z: 5 },
+    exitZ: 6,
+    props: [
+      { type: 'counter', x: 0, z: -4.5, w: 5, d: 1.5, h: 1.2, color: '#4a3a28' },
+      { type: 'pillar', x: -5, z: -2 },
+      { type: 'pillar', x: 5, z: -2 },
+      { type: 'rug', x: 0, z: 0, w: 5, d: 6, color: '#3d6f8c' },
+      { type: 'plant', x: -6, z: 4 },
+      { type: 'plant', x: 6, z: 4 },
+    ],
+    interactables: [
+      { id: 'hall-desk', name: 'Quest Board', emoji: '📜', x: 0, z: -3.5, action: 'View Quests', activity: 'townhall' },
+    ],
+  },
+  mine: {
+    name: 'Crystal Mine',
+    emoji: '⛏️',
+    w: 13,
+    d: 12,
+    floor: '#4a4a55',
+    wall: '#2a2a32',
+    accent: '#7ec8e3',
+    spawn: { x: 0, z: 4 },
+    exitZ: 5,
+    props: [
+      { type: 'crystal', x: -3, z: -3 },
+      { type: 'crystal', x: 3.5, z: -2 },
+      { type: 'crystal', x: 0, z: -4 },
+      { type: 'rock', x: -4, z: 1 },
+      { type: 'rock', x: 4, z: 2 },
+      { type: 'crate', x: -2, z: 2 },
+    ],
+    interactables: [
+      { id: 'mine-vein', name: 'Crystal Vein', emoji: '💎', x: 0, z: -3.5, action: 'Mine Ore', activity: 'mine' },
+    ],
+  },
+  plumbhq: {
+    name: 'Pipeworks HQ',
+    emoji: '🔧',
+    w: 15,
+    d: 13,
+    floor: '#7a8fa8',
+    wall: '#2C4060',
+    accent: '#4A6FA5',
+    spawn: { x: 0, z: 4.5 },
+    exitZ: 5.5,
+    props: [
+      { type: 'counter', x: 0, z: -4, w: 6, d: 1.3, h: 1.1, color: '#3a4a5c' },
+      { type: 'pipe', x: -5, z: -1 },
+      { type: 'pipe', x: 5, z: 1 },
+      { type: 'crate', x: -4, z: 2 },
+      { type: 'crate', x: 4, z: 2.5 },
+      { type: 'plant', x: -6, z: 4 },
+    ],
+    interactables: [
+      {
+        id: 'hq-desk',
+        name: 'Crew Desk',
+        emoji: '🔧',
+        x: 0,
+        z: -3.2,
+        action: 'Crew Briefing',
+        activity: 'plumbhq',
+      },
+    ],
+  },
+};
+
+/** Town locals + the Greek plumber crew + Billy */
 export const NPCS = [
   {
     id: 1,
@@ -180,7 +312,30 @@ export const NPCS = [
     action: 'Talk',
     dialogue: 'Need lumber? The forest always has more trees. Tell Nico I said hi!',
   },
-  // —— Plumber crew (roam around town near their posts) ——
+  {
+    id: 6,
+    name: 'Billy',
+    x: -2,
+    z: 4,
+    emoji: '🧑',
+    color: '#7ec8ff',
+    role: 'billy',
+    title: 'Town Legend',
+    wheelchair: true,
+    roamRadius: 7,
+    walkSpeed: 1.05,
+    action: 'Talk',
+    dialogue:
+      "Hey! I'm Billy. Wheels don't slow me down — I know every crack in this town's sidewalks.",
+    dialogues: [
+      "Hey! I'm Billy. Wheels don't slow me down around Cozy Town.",
+      'Best racing line? Fountain → cafe → dock. Ask me anytime.',
+      'The plumbers are good people. Tell Nico I still want that ramp at HQ!',
+      "If you're blasting friends, aim fair — and help with the leaks too!",
+      'I roll the square most days. Wave if you see the blue chair!',
+    ],
+  },
+  // —— Plumber crew (roam + fix leaks) ——
   {
     id: 10,
     name: 'Nico “The Wrench”',
@@ -190,15 +345,15 @@ export const NPCS = [
     color: '#5B8DEF',
     role: 'plumber',
     title: 'Crew Boss',
-    roamRadius: 14,
+    roamRadius: 16,
     walkSpeed: 1.7,
     action: 'Talk',
     dialogue:
       'Kalimera! I’m Nico, boss of the plumber crew. Fix the leaking pipes around town — talk to the crew and use Fix Pipe at the leaks!',
     dialogues: [
       'Kalimera! I’m Nico, boss of the plumber crew.',
-      'Leaks pop up near the fountain, cafe, dock, and HQ. Fix them for coins!',
-      'Need firepower? Sam sells a Plumber Blaster and Wrench Grenades. Pure chaos. Pure fun.',
+      'Leaks never stop — we fix, they return. Personal fixes count for YOUR quests!',
+      'Need firepower? Sam sells a Plumber Blaster. Arcade rules — tag friends!',
       'A good plumber listens to the pipes… and never loses their wrench.',
       'I walk the whole town checking pressure — catch me when you can!',
     ],
@@ -212,13 +367,13 @@ export const NPCS = [
     color: '#7EB6FF',
     role: 'plumber',
     title: 'Pipe Whisperer',
-    roamRadius: 9,
+    roamRadius: 11,
     walkSpeed: 1.4,
     action: 'Talk',
     dialogue: 'This fountain spring is a drama queen. Stand close to the leak and hit Fix Pipe!',
     dialogues: [
       'Yiannis here — I talk to pipes. They talk back.',
-      'Fountain leak is right here. Fix it before the park becomes a pool!',
+      'Fountain leak keeps coming back. We fix it together.',
       'Pressure is poetry. Also, don’t grenade the main valve. Please.',
       'I patrol the square — if you miss me, wait by the fountain.',
     ],
@@ -232,13 +387,13 @@ export const NPCS = [
     color: '#FF9ECD',
     role: 'plumber',
     title: 'Junior Ace',
-    roamRadius: 10,
+    roamRadius: 12,
     walkSpeed: 2.0,
     action: 'Talk',
     dialogue: 'Sofia! Cafe pipes are my beat. Grab a wrench energy and fix the leak by the kitchen wall.',
     dialogues: [
       'Hey! Sofia — junior ace of the crew.',
-      'Cafe leak is behind Luna’s place. Fix Pipe when you’re close!',
+      'Cafe leak is behind Luna’s place. I’ll seal it if you’re busy!',
       'Coffee + plumbing = the Cozy Town dream.',
       'I’m usually jogging between the cafe and HQ — wave if you see me!',
     ],
@@ -252,7 +407,7 @@ export const NPCS = [
     color: '#FFB347',
     role: 'plumber',
     title: 'Dock Specialist',
-    roamRadius: 8,
+    roamRadius: 10,
     walkSpeed: 1.5,
     action: 'Talk',
     dialogue: 'Dimitri at your service! Dock pipes freeze, crack, then party. Fix the leak on the pier.',
@@ -272,20 +427,100 @@ export const NPCS = [
     color: '#C3A6FF',
     role: 'plumber',
     title: 'Demo & Drama',
-    roamRadius: 12,
+    roamRadius: 14,
     walkSpeed: 1.85,
     action: 'Talk',
     dialogue: 'Elena. I handle “controlled demolitions”… I mean pressure releases. Wrench Grenades go boom, pipes go calm.',
     dialogues: [
       'Elena — demo specialist. Mostly jokes. Mostly.',
-      'HQ side leak needs a hero. Fix Pipe, then maybe toss a grenade at a rock for fun.',
-      'Look around with right-drag or the look stick. You’ll see my handiwork everywhere.',
+      'HQ side leak needs a hero. Fix Pipe, then maybe toss a grenade for fun.',
+      'Look around with the right stick. Move on the left — like a normal controller!',
       'If I’m walking, I’m thinking. If I’m running, something exploded. Probably fine.',
+    ],
+  },
+  {
+    id: 15,
+    name: 'Costa',
+    x: 12,
+    z: -6,
+    emoji: '👷',
+    color: '#4fd1c5',
+    role: 'plumber',
+    title: 'Valve Runner',
+    roamRadius: 15,
+    walkSpeed: 2.1,
+    action: 'Talk',
+    dialogue: 'Costa — I sprint to every valve before the grass gets soggy.',
+    dialogues: [
+      'Costa on the move! Valves wait for no one.',
+      'If you see a new puddle, yell — I’ll roll out.',
+      'Master Plumber quest? YOU have to fix four — not just watch us.',
+      'Left stick move, right stick look. Classic.',
+    ],
+  },
+  {
+    id: 16,
+    name: 'Maria',
+    x: 8,
+    z: 18,
+    emoji: '👩‍🏭',
+    color: '#f687b3',
+    role: 'plumber',
+    title: 'Seal Specialist',
+    roamRadius: 13,
+    walkSpeed: 1.55,
+    action: 'Talk',
+    dialogue: 'Maria here. Perfect seals, every time. Mostly.',
+    dialogues: [
+      'Maria — seals, gaskets, and good coffee.',
+      'Leaks respawn. That’s job security, friend.',
+      'Billy races me around the square. He usually wins.',
+      'Fix four yourself for Master Plumber. We only help the town.',
+    ],
+  },
+  {
+    id: 17,
+    name: 'Theo',
+    x: -20,
+    z: 6,
+    emoji: '🧔‍♂️',
+    color: '#68d391',
+    role: 'plumber',
+    title: 'Night Shift',
+    roamRadius: 14,
+    walkSpeed: 1.35,
+    action: 'Talk',
+    dialogue: 'Theo. Day or night, the pipes still leak.',
+    dialogues: [
+      'Theo — night shift energy, daytime hours. Don’t ask.',
+      'I take the weird leaks near the forest edge.',
+      'Blaster tag is fine. Just don’t shoot the main line.',
+      'Catch me west of town — slow and steady.',
+    ],
+  },
+  {
+    id: 18,
+    name: 'Katerina',
+    x: 22,
+    z: -8,
+    emoji: '🧑‍🚒',
+    color: '#fc8181',
+    role: 'plumber',
+    title: 'Emergency Patch',
+    roamRadius: 15,
+    walkSpeed: 1.95,
+    action: 'Talk',
+    dialogue: 'Katerina — emergency patch kit always ready!',
+    dialogues: [
+      'Katerina reporting! Got a leak? I’m already halfway there.',
+      'Shop side pipes act up when Sam stockpiles soda.',
+      'We fix the town. You fix for quest glory. Teamwork!',
+      'See you on the east side of town.',
     ],
   },
 ];
 
-/** Interactable leaking pipes */
+/** Interactable leaking pipes — keep respawning forever */
 export const PIPE_LEAKS = [
   {
     id: 'leak-fountain',
@@ -327,7 +562,52 @@ export const PIPE_LEAKS = [
     activity: 'fixpipe',
     hint: 'Elena left tools here',
   },
+  {
+    id: 'leak-park',
+    name: 'Park Sprinkler Break',
+    x: -4,
+    z: -18,
+    emoji: '💧',
+    action: 'Fix Pipe',
+    activity: 'fixpipe',
+    hint: 'Costa’s sprint route',
+  },
+  {
+    id: 'leak-shop',
+    name: 'Store Side Main',
+    x: 16,
+    z: 7,
+    emoji: '🚰',
+    action: 'Fix Pipe',
+    activity: 'fixpipe',
+    hint: 'Maria’s patch zone',
+  },
+  {
+    id: 'leak-forest',
+    name: 'Forest Feeder Pipe',
+    x: 22,
+    z: -16,
+    emoji: '💦',
+    action: 'Fix Pipe',
+    activity: 'fixpipe',
+    hint: 'Theo’s quiet job',
+  },
+  {
+    id: 'leak-mine',
+    name: 'Mine Coolant Line',
+    x: 25,
+    z: 20,
+    emoji: '🔧',
+    action: 'Fix Pipe',
+    activity: 'fixpipe',
+    hint: 'Katerina’s emergency call',
+  },
 ];
+
+/** Seconds before a fixed leak reappears (randomized in systems) */
+export const LEAK_RESPAWN_MIN = 22;
+export const LEAK_RESPAWN_MAX = 48;
+export const PERSONAL_FIXES_FOR_MASTER = 4;
 
 export const QUESTS = [
   {
@@ -375,16 +655,23 @@ export const QUESTS = [
   {
     id: 'pipe-rookie',
     title: 'Pipe Rookie',
-    description: 'Fix any leaking pipe',
+    description: 'Personally fix any leaking pipe',
     reward: { coins: 70, xp: 35 },
     completeOn: 'fixpipe',
   },
   {
     id: 'master-plumber',
     title: 'Master Plumber',
-    description: 'Fix 4 leaks around town',
+    description: 'Personally fix 4 leaks (NPC fixes don’t count)',
     reward: { coins: 200, xp: 100 },
     completeOn: 'fixpipe-all',
+  },
+  {
+    id: 'meet-billy',
+    title: 'Roll With Billy',
+    description: 'Talk to Billy in the town square',
+    reward: { coins: 45, xp: 25 },
+    completeOn: 'talk-billy',
   },
 ];
 
@@ -397,6 +684,7 @@ export const SHOP_ITEMS = [
   { id: 'wrench', name: 'Golden Wrench', emoji: '🔧', price: 35, desc: 'Badge of the plumber crew' },
   { id: 'ammo', name: 'Blaster Ammo ×20', emoji: '🔫', price: 25, desc: 'Restock the Plumber Blaster' },
   { id: 'grenades', name: 'Wrench Grenades ×3', emoji: '💣', price: 40, desc: 'Arcade boom — pure fun' },
+  { id: 'medkit', name: 'First Aid Kit', emoji: '❤️', price: 30, desc: 'Restore full health' },
 ];
 
 export const ACTIVITIES = {
@@ -454,8 +742,9 @@ export const ACTIVITIES = {
 export const AVATARS = ['😊', '😎', '🧑‍🔧', '👩‍🔧', '🧔', '🧒', '🦊', '🐱', '🐸', '🦉'];
 
 export const INTERACT_RANGE = 5.5;
+export const INTERIOR_INTERACT_RANGE = 2.8;
 
-/** Cartoon weapons — for fun, not realism */
+/** Cartoon weapons — arcade damage, Minecraft-ish multi-hit KO */
 export const WEAPONS = {
   gun: {
     id: 'gun',
@@ -464,7 +753,8 @@ export const WEAPONS = {
     cooldown: 0.18,
     speed: 42,
     lifetime: 1.2,
-    damage: 1,
+    damage: 28,
+    hitRadius: 1.35,
   },
   grenade: {
     id: 'grenade',
@@ -474,5 +764,6 @@ export const WEAPONS = {
     throwSpeed: 14,
     fuse: 1.35,
     radius: 5,
+    damage: 55,
   },
 };
