@@ -123,7 +123,13 @@ function FollowCamera({ target }) {
       applyLookDelta(lookInput.x * 420 * dt, lookInput.y * 420 * dt, 0.01);
     }
 
-    const { yaw, pitch, distance } = lookState;
+    // Clamp camera inside room bounds when indoors so walls aren't seen from outside
+    const indoor = lookState.indoor;
+    let { yaw, pitch, distance } = lookState;
+    if (indoor) {
+      distance = Math.min(distance, 6.2);
+      pitch = Math.max(pitch, 0.55);
+    }
     const cp = Math.cos(pitch);
     const sp = Math.sin(pitch);
     _desired.set(
@@ -131,9 +137,18 @@ function FollowCamera({ target }) {
       target.current.y + distance * sp,
       target.current.z + Math.cos(yaw) * distance * cp
     );
+    if (indoor) {
+      // keep camera roughly inside room footprint
+      _desired.x = THREE.MathUtils.clamp(_desired.x, target.current.x - 5.5, target.current.x + 5.5);
+      _desired.z = THREE.MathUtils.clamp(_desired.z, target.current.z - 5.5, target.current.z + 5.5);
+      _desired.y = Math.max(_desired.y, 2.2);
+      _desired.y = Math.min(_desired.y, 5.8);
+    }
     camera.position.lerp(_desired, 1 - Math.pow(0.0008, dt));
-    _lookAt.set(target.current.x, target.current.y + 0.8, target.current.z);
+    _lookAt.set(target.current.x, target.current.y + (indoor ? 1.0 : 0.8), target.current.z);
     camera.lookAt(_lookAt);
+    camera.near = indoor ? 0.05 : 0.1;
+    camera.far = indoor ? 40 : 200;
   });
 
   return null;
@@ -173,6 +188,12 @@ function InteractKey() {
   return null;
 }
 
+function OutdoorSky() {
+  const interiorId = useGameStore((s) => s.interiorId);
+  if (interiorId) return null;
+  return <Sky sunPosition={[80, 40, 30]} turbidity={6} rayleigh={1.2} />;
+}
+
 export default function GameCanvas() {
   const cameraTarget = useRef(new THREE.Vector3(0, 0.5, 0));
 
@@ -186,7 +207,7 @@ export default function GameCanvas() {
       onContextMenu={(e) => e.preventDefault()}
     >
       <Suspense fallback={null}>
-        <Sky sunPosition={[80, 40, 30]} turbidity={6} rayleigh={1.2} />
+        <OutdoorSky />
         <FollowCamera target={cameraTarget} />
         <InteractKey />
         <World />

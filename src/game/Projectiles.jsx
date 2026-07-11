@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { NPCS, WEAPONS, WORLD } from './data';
 import { getLookBasis } from './lookState';
-import { getNpcPos } from './npcRuntime';
+import { getNpcPos, isNpcAlive } from './npcRuntime';
 import { useGameStore } from './store';
 import { sfx } from '../audio/sounds';
 
@@ -23,7 +23,6 @@ export default function Projectiles() {
   const list = useRef([]);
   const fireRequest = useGameStore((s) => s.fireRequest);
   const clearFireRequest = useGameStore((s) => s.clearFireRequest);
-  const onNpcHit = useGameStore((s) => s.onNpcHit);
   const showToast = useGameStore((s) => s.showToast);
   const hitCooldown = useRef(new Map());
   const fireCd = useRef(0);
@@ -195,15 +194,16 @@ export default function Projectiles() {
         let hitSomething = false;
 
         if (!p.remote) {
-          // Hit NPCs (fun reaction only)
+          // Hit NPCs — arcade damage + respawn
           for (const npc of NPCS) {
+            if (!isNpcAlive(npc.id)) continue;
             const pos = getNpcPos(npc.id);
             const d = Math.hypot(p.x - pos.x, p.z - pos.z);
             if (d < WEAPONS.gun.hitRadius && p.y < 2.8) {
               const last = hitCooldown.current.get(`npc-${npc.id}`) || 0;
-              if (Date.now() - last > 750) {
+              if (Date.now() - last > 180) {
                 hitCooldown.current.set(`npc-${npc.id}`, Date.now());
-                onNpcHit(npc.id);
+                st.damageNpc(npc.id, WEAPONS.gun.damage);
                 sfx.hit();
               }
               hitSomething = true;
@@ -295,9 +295,10 @@ export default function Projectiles() {
 
           if (!p.remote) {
             for (const npc of NPCS) {
+              if (!isNpcAlive(npc.id)) continue;
               const pos = getNpcPos(npc.id);
               if (Math.hypot(p.x - pos.x, p.z - pos.z) < radius) {
-                onNpcHit(npc.id);
+                st.damageNpc(npc.id, dmg);
               }
             }
             for (const [peerId, remote] of Object.entries(st.remotePlayers)) {

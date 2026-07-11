@@ -3,6 +3,7 @@ import {
   ACTIVITIES,
   AVATARS,
   BUILDINGS,
+  GROUND_PICKUPS,
   INTERACT_RANGE,
   INTERIOR_INTERACT_RANGE,
   INTERIORS,
@@ -10,6 +11,8 @@ import {
   LEAK_RESPAWN_MIN,
   NPCS,
   PERSONAL_FIXES_FOR_MASTER,
+  PICKUP_RESPAWN_MAX,
+  PICKUP_RESPAWN_MIN,
   PIPE_LEAKS,
   PLAYER_MAX_HP,
   QUESTS,
@@ -17,8 +20,9 @@ import {
   WEAPONS,
 } from './data';
 import { sfx } from '../audio/sounds';
-import { getLookBasis } from './lookState';
-import { getNpcPos } from './npcRuntime';
+import { getLookBasis, setIndoorCamera } from './lookState';
+import { clearRoomFromUrl, disconnectMultiplayer } from './multiplayer';
+import { damageNpcRuntime, getNpcPos, isNpcAlive } from './npcRuntime';
 
 const SAVE_KEY = 'cozy-town-v3';
 const PROFILE_KEY = 'cozy-town-profile-v1';
@@ -82,6 +86,13 @@ function randomRespawnMs() {
   return sec * 1000;
 }
 
+function randomPickupRespawnMs() {
+  const sec =
+    PICKUP_RESPAWN_MIN +
+    Math.random() * (PICKUP_RESPAWN_MAX - PICKUP_RESPAWN_MIN);
+  return sec * 1000;
+}
+
 export const useGameStore = create((set, get) => ({
   started: false,
   player: {
@@ -94,6 +105,8 @@ export const useGameStore = create((set, get) => ({
   completedQuests: saved?.completedQuests ?? [],
   /** Personal pipe fixes only (quests use this) */
   personalFixes: saved?.personalFixes ?? 0,
+  /** Flowers / mushrooms picked (quest progress) */
+  personalPickups: saved?.personalPickups ?? 0,
   /**
    * World leak state: which leaks are currently open.
    * When fixed (player or NPC), removed; scheduled to reappear.
@@ -101,10 +114,16 @@ export const useGameStore = create((set, get) => ({
   openLeaks: saved?.openLeaks ?? defaultOpenLeaks(),
   /** @type {Record<string, number>} leakId -> respawn timestamp */
   leakRespawnAt: {},
+  /** Pickup ids currently missing from world */
+  collectedPickups: [],
+  /** @type {Record<string, number>} pickupId -> respawn timestamp */
+  pickupRespawnAt: {},
   /** Pokemon-style interior id or null (outside) */
   interiorId: null,
   outdoorPos: { x: 0, z: 0 },
   npcDialogueIndex: {},
+  /** version bump for UI chips */
+  mpError: null,
   messages: [
     {
       id: 1,
@@ -175,11 +194,13 @@ export const useGameStore = create((set, get) => ({
       hp: get().player.hp > 0 ? get().player.hp : PLAYER_MAX_HP,
     };
     const roomCode = options.roomCode || null;
+    setIndoorCamera(false);
     set({
       started: true,
       player,
       roomCode,
       mpStatus: roomCode ? 'connecting' : 'offline',
+      mpError: null,
       peerCount: 0,
       remotePlayers: {},
       interiorId: null,
@@ -187,13 +208,58 @@ export const useGameStore = create((set, get) => ({
     if (roomCode) {
       get().pushMessage(
         'System',
-        `Joining multiplayer room ${roomCode}… share the invite link with friends!`,
+        `Joining multiplayer room ${roomCode}… friends need the same code/link. Keep this tab open while connecting!`,
         true
       );
     } else {
-      get().pushMessage('System', `Welcome, ${player.name}! Explore the town (solo).`, true);
+      get().pushMessage(
+        'System',
+        `Welcome, ${player.name}! Explore, pick flowers, or open Menu → Leave to join friends.`,
+        true
+      );
     }
     get().save();
+  },
+
+  /**
+   * Return to title screen so you can create/join a different room.
+   * Keeps local profile progress.
+   */
+  leaveToTitle({ clearRoom = true } = {}) {
+    get().save();
+    disconnectMultiplayer();
+    if (clearRoom) clearRoomFromUrl();
+    setIndoorCamera(false);
+    set({
+      started: false,
+      roomCode: null,
+      mpStatus: 'offline',
+      mpError: null,
+      peerCount: 0,
+      remotePlayers: {},
+      interiorId: null,
+      netSendState: null,
+      netSendChat: null,
+      netSendFire: null,
+      netSendHit: null,
+      fireHeld: false,
+      fireRequest: null,
+      projectiles: [],
+      explosions: [],
+      nearby: null,
+      moveInput: { x: 0, z: 0 },
+      lookInput: { x: 0, y: 0 },
+      panels: {
+        menu: false,
+        quests: false,
+        inventory: false,
+        shop: false,
+        share: false,
+        settings: false,
+        chat: false,
+      },
+    });
+    get().showToast('Back at title — join friends anytime');
   },
 
   setNetHandlers({ sendState, sendChat, sendFire, sendHit }) {
@@ -416,6 +482,7 @@ export const useGameStore = create((set, get) => ({
     if (!b?.enterable || !room) return;
     const { player } = get();
     sfx.interact();
+    setIndoorCamera(true);
     set({
       interiorId: buildingId,
       outdoorPos: { x: player.x, z: player.z },
@@ -427,7 +494,11 @@ export const useGameStore = create((set, get) => ({
       nearby: null,
     });
     get().showToast(`Entered ${room.name}`);
-    get().pushMessage('System', `You're inside ${room.emoji} ${room.name}. Walk to the door mat to leave.`, true);
+    get().pushMessage(
+      'System',
+      `You're inside ${room.emoji} ${room.name}. Walk onto the 🚪 mat (or Leave) to exit.`,
+      true
+    );
   },
 
   exitInterior() {
@@ -435,6 +506,7 @@ export const useGameStore = create((set, get) => ({
     if (!interiorId) return;
     const b = BUILDINGS.find((x) => x.id === interiorId);
     sfx.interact();
+    setIndoorCamera(false);
     // Place just outside the door
     const ox = b ? b.x : outdoorPos.x;
     const oz = b ? b.z + b.d / 2 + 1.5 : outdoorPos.z;
@@ -446,10 +518,87 @@ export const useGameStore = create((set, get) => ({
     get().showToast('Back outside');
   },
 
+  tickPickups() {
+    const now = Date.now();
+    const { pickupRespawnAt, collectedPickups } = get();
+    let changed = false;
+    const nextCollected = [...collectedPickups];
+    const nextAt = { ...pickupRespawnAt };
+    for (const [id, t] of Object.entries(pickupRespawnAt)) {
+      if (t <= now) {
+        const idx = nextCollected.indexOf(id);
+        if (idx >= 0) {
+          nextCollected.splice(idx, 1);
+          changed = true;
+        }
+        delete nextAt[id];
+      }
+    }
+    if (changed) set({ collectedPickups: nextCollected, pickupRespawnAt: nextAt });
+  },
+
+  collectPickup(pickupId) {
+    const pickup = GROUND_PICKUPS.find((p) => p.id === pickupId);
+    if (!pickup) return false;
+    const { collectedPickups, personalPickups, player } = get();
+    if (collectedPickups.includes(pickupId)) return false;
+
+    const inventory = addInventoryItem(player.inventory, {
+      id: `flower-${pickup.emoji}`,
+      name: pickup.name,
+      emoji: pickup.emoji,
+    });
+    const nextPersonal = personalPickups + 1;
+    set({
+      collectedPickups: [...collectedPickups, pickupId],
+      pickupRespawnAt: {
+        ...get().pickupRespawnAt,
+        [pickupId]: Date.now() + randomPickupRespawnMs(),
+      },
+      personalPickups: nextPersonal,
+      player: {
+        ...player,
+        coins: player.coins + (pickup.coins || 0),
+        inventory,
+      },
+    });
+    get().grantXp(pickup.xp || 2);
+    sfx.coin();
+    get().showToast(`${pickup.emoji} ${pickup.name} +${pickup.coins}💰`);
+    get().pushMessage('System', `Picked ${pickup.emoji} ${pickup.name}!`, true);
+    if (nextPersonal >= 5) get().completeQuestIfNeeded('pickup-5');
+    get().save();
+    return true;
+  },
+
+  /** Damage an NPC (arcade). Returns true if KO'd this hit. */
+  damageNpc(npcId, amount) {
+    const result = damageNpcRuntime(npcId, amount);
+    if (!result) return false;
+    const npc = NPCS.find((n) => n.id === npcId);
+    if (!npc) return false;
+
+    if (result.killed) {
+      sfx.explosion();
+      get().showToast(`${npc.name} KO!`);
+      get().pushMessage(
+        'System',
+        `💥 ${npc.name} was knocked out! They’ll respawn in a few seconds.`,
+        true
+      );
+      get().grantXp(8);
+      return true;
+    }
+
+    // hit reaction chatter
+    get().onNpcHit(npcId);
+    return false;
+  },
+
   updateNearby(px, pz) {
     let best = null;
     let bestDist = INTERACT_RANGE;
-    const { openLeaks, interiorId } = get();
+    const { openLeaks, interiorId, collectedPickups } = get();
 
     if (interiorId) {
       const room = INTERIORS[interiorId];
@@ -481,6 +630,22 @@ export const useGameStore = create((set, get) => ({
       }
       set({ nearby: best });
       return;
+    }
+
+    // Ground pickups first (close range) so flowers are easy to grab
+    for (const p of GROUND_PICKUPS) {
+      if (collectedPickups.includes(p.id)) continue;
+      const dist = Math.hypot(px - p.x, pz - p.z);
+      if (dist < Math.min(bestDist, 2.2)) {
+        bestDist = dist;
+        best = {
+          type: 'pickup',
+          id: p.id,
+          name: p.name,
+          emoji: p.emoji,
+          action: 'Pick up',
+        };
+      }
     }
 
     for (const leak of PIPE_LEAKS) {
@@ -517,6 +682,7 @@ export const useGameStore = create((set, get) => ({
     }
 
     for (const n of NPCS) {
+      if (!isNpcAlive(n.id)) continue;
       const pos = getNpcPos(n.id);
       const dist = Math.hypot(px - pos.x, pz - pos.z);
       if (dist < bestDist) {
@@ -610,6 +776,11 @@ export const useGameStore = create((set, get) => ({
       if (npc?.id === 10) get().completeQuestIfNeeded('talk-nico');
       if (npc?.id === 6 || npc?.role === 'billy') get().completeQuestIfNeeded('talk-billy');
       get().save();
+      return;
+    }
+
+    if (nearby.type === 'pickup') {
+      get().collectPickup(nearby.id);
       return;
     }
 
@@ -820,17 +991,19 @@ export const useGameStore = create((set, get) => ({
     if (!npc) return;
     const lines = npc.wheelchair
       ? [
-          'Nice shot — wheels still rolling!',
           'Hey! Watch the spokes!',
-          'I’m undefeated in wheelchair races, not dodgeball…',
+          'I’m undefeated in wheelchair races… not dodgeball!',
+          'Oof — fair shot!',
         ]
-      : [
-          'Hey! Watch the pipes!',
-          'Ow — rubber bullet? Still rude!',
-          'I’m on break!',
-          'That tickles. Focus on the leaks!',
-          'Nico will hear about this…',
-        ];
+      : npc.role === 'gardener'
+        ? ['My flowers! Rude!', 'Emily says no shooting in the garden… oops.', 'Ow! At least water the roses after.']
+        : [
+            'Hey! Watch the pipes!',
+            'Ow — that stung!',
+            'I’m on break!',
+            'Focus on the leaks… after you stop shooting me!',
+            'Nico will hear about this…',
+          ];
     get().pushMessage(npc.name, lines[Math.floor(Math.random() * lines.length)]);
   },
 
@@ -944,9 +1117,9 @@ export const useGameStore = create((set, get) => ({
   },
 
   save() {
-    const { player, completedQuests, muted, openLeaks, personalFixes } = get();
+    const { player, completedQuests, muted, openLeaks, personalFixes, personalPickups } = get();
     const payload = {
-      version: 4,
+      version: 5,
       savedAt: Date.now(),
       player: {
         name: player.name,
@@ -965,6 +1138,7 @@ export const useGameStore = create((set, get) => ({
       completedQuests,
       openLeaks,
       personalFixes,
+      personalPickups,
       muted,
     };
     try {
@@ -993,12 +1167,16 @@ export const useGameStore = create((set, get) => ({
     } catch {
       /* ignore */
     }
+    setIndoorCamera(false);
     set({
       player: { ...defaultPlayer(), name, avatar, x: 0, z: 0 },
       completedQuests: [],
       personalFixes: 0,
+      personalPickups: 0,
       openLeaks: defaultOpenLeaks(),
       leakRespawnAt: {},
+      collectedPickups: [],
+      pickupRespawnAt: {},
       interiorId: null,
       projectiles: [],
       explosions: [],
@@ -1009,7 +1187,7 @@ export const useGameStore = create((set, get) => ({
         {
           id: Date.now(),
           sender: 'System',
-          text: 'World reset! Leaks are back, inventory cleared. 🔧',
+          text: 'World reset! Leaks & flowers are back, inventory cleared. 🔧🌷',
           system: true,
         },
       ],

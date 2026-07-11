@@ -9,11 +9,15 @@ export const lookState = {
   distance: 16,
   /** set true while user is dragging look so UI can ignore */
   dragging: false,
+  indoor: false,
 };
+
+const OUTDOOR = { pitch: 0.62, distance: 16, pitchMin: 0.22, pitchMax: 1.25 };
+// Keep camera *inside* the room so you don't see exterior wall backs
+const INDOOR = { pitch: 0.95, distance: 5.5, pitchMin: 0.55, pitchMax: 1.15 };
 
 export function getLookBasis() {
   const yaw = lookState.yaw;
-  // camera sits behind player; forward on ground is away from camera offset
   const forwardX = -Math.sin(yaw);
   const forwardZ = -Math.cos(yaw);
   const rightX = Math.cos(yaw);
@@ -23,8 +27,17 @@ export function getLookBasis() {
 
 export function applyLookDelta(dx, dy, sensitivity = 0.005) {
   lookState.yaw -= dx * sensitivity;
+  const cfg = lookState.indoor ? INDOOR : OUTDOOR;
   lookState.pitch = Math.min(
-    1.25,
-    Math.max(0.22, lookState.pitch + dy * sensitivity)
+    cfg.pitchMax,
+    Math.max(cfg.pitchMin, lookState.pitch + dy * sensitivity)
   );
+}
+
+/** Pokémon-style indoor cam: tighter, higher angle, stays in the box */
+export function setIndoorCamera(enabled) {
+  lookState.indoor = Boolean(enabled);
+  const cfg = lookState.indoor ? INDOOR : OUTDOOR;
+  lookState.distance = cfg.distance;
+  lookState.pitch = cfg.pitch;
 }

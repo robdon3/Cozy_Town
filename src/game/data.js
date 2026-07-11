@@ -6,6 +6,9 @@ export const WORLD = {
 };
 
 export const PLAYER_MAX_HP = 100;
+export const NPC_MAX_HP = 60;
+/** Arcade KO — a few blaster hits */
+export const NPC_RESPAWN_MS = 8000;
 
 export const BUILDINGS = [
   {
@@ -127,6 +130,21 @@ export const BUILDINGS = [
     action: 'Enter HQ',
     activity: 'plumbhq',
     enterable: true,
+  },
+  {
+    id: 'emily-garden',
+    name: "Emily's Garden",
+    x: -8,
+    z: -28,
+    w: 12,
+    d: 10,
+    h: 0.35,
+    color: '#5cb87a',
+    roof: '#3d9b5c',
+    emoji: '🌷',
+    action: 'Visit Garden',
+    activity: 'garden',
+    flat: true,
   },
 ];
 
@@ -333,6 +351,26 @@ export const NPCS = [
       'The plumbers are good people. Tell Nico I still want that ramp at HQ!',
       "If you're blasting friends, aim fair — and help with the leaks too!",
       'I roll the square most days. Wave if you see the blue chair!',
+    ],
+  },
+  {
+    id: 7,
+    name: 'Emily',
+    x: -8,
+    z: -26,
+    emoji: '👩‍🌾',
+    color: '#f9a8d4',
+    role: 'gardener',
+    title: 'Garden Keeper',
+    roamRadius: 5,
+    walkSpeed: 1.2,
+    action: 'Talk',
+    dialogue: "Hi! I'm Emily — pick any flowers or mushrooms you like. They grow back!",
+    dialogues: [
+      "Welcome to Emily's Garden! Pick flowers, mushrooms, and petals — they're for sharing.",
+      'Everything you pick goes in your inventory. Come back later — they regrow!',
+      'Billy says the blue flowers are lucky. I just think they smell nice.',
+      'If the plumbers flood the park again… well, more water for the roses!',
     ],
   },
   // —— Plumber crew (roam + fix leaks) ——
@@ -673,6 +711,20 @@ export const QUESTS = [
     reward: { coins: 45, xp: 25 },
     completeOn: 'talk-billy',
   },
+  {
+    id: 'emilys-bouquet',
+    title: "Emily's Bouquet",
+    description: 'Pick 5 flowers or mushrooms from the ground',
+    reward: { coins: 60, xp: 35 },
+    completeOn: 'pickup-5',
+  },
+  {
+    id: 'visit-garden',
+    title: "Visit Emily's Garden",
+    description: "Relax in Emily's Garden south of town",
+    reward: { coins: 40, xp: 20 },
+    completeOn: 'garden',
+  },
 ];
 
 export const SHOP_ITEMS = [
@@ -737,7 +789,84 @@ export const ACTIVITIES = {
     message: 'Pipeworks HQ — home of Cozy Town’s finest plumbers!',
     item: null,
   },
+  garden: {
+    xp: 6,
+    coins: 0,
+    energy: 12,
+    message: "You breathe in Emily's garden — so peaceful. 🌷",
+    item: null,
+  },
 };
+
+/** Deterministic ground pickups (flowers, mushrooms, etc.) */
+function seeded(i, salt = 0) {
+  const n = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+const PICKUP_KINDS = [
+  { emoji: '🌸', name: 'Pink Blossom', coins: 4, xp: 2 },
+  { emoji: '🌺', name: 'Hibiscus', coins: 5, xp: 2 },
+  { emoji: '🌼', name: 'Daisy', coins: 3, xp: 2 },
+  { emoji: '🌻', name: 'Sunflower', coins: 6, xp: 3 },
+  { emoji: '🍄', name: 'Mushroom', coins: 5, xp: 3 },
+  { emoji: '🌷', name: 'Tulip', coins: 5, xp: 2 },
+  { emoji: '🌹', name: 'Rose', coins: 7, xp: 3 },
+  { emoji: '🍀', name: 'Lucky Clover', coins: 8, xp: 4 },
+];
+
+/** Build stable world pickup list once */
+export const GROUND_PICKUPS = (() => {
+  const list = [];
+  // Town scatter
+  for (let i = 0; i < 36; i++) {
+    const kind = PICKUP_KINDS[i % PICKUP_KINDS.length];
+    const a = seeded(i, 1) * Math.PI * 2;
+    const r = 6 + seeded(i, 2) * 28;
+    let x = Math.cos(a) * r;
+    let z = Math.sin(a) * r;
+    // keep off roads & water a bit
+    if (Math.abs(x) < 2.2) x += x < 0 ? -3 : 3;
+    if (Math.abs(z) < 2.2) z += z < 0 ? -3 : 3;
+    if (x < -22 && z > 18) {
+      x = -14;
+      z = 10;
+    }
+    list.push({
+      id: `town-${i}`,
+      x,
+      z,
+      emoji: kind.emoji,
+      name: kind.name,
+      coins: kind.coins,
+      xp: kind.xp,
+      zone: 'town',
+    });
+  }
+  // Emily's Garden dense patch (south of town)
+  const gx = -8;
+  const gz = -28;
+  for (let i = 0; i < 28; i++) {
+    const kind = PICKUP_KINDS[i % PICKUP_KINDS.length];
+    const ox = (seeded(i, 7) - 0.5) * 10;
+    const oz = (seeded(i, 9) - 0.5) * 8;
+    list.push({
+      id: `garden-${i}`,
+      x: gx + ox,
+      z: gz + oz,
+      emoji: kind.emoji,
+      name: kind.name,
+      coins: kind.coins + 1,
+      xp: kind.xp + 1,
+      zone: 'garden',
+    });
+  }
+  return list;
+})();
+
+/** Seconds before a picked flower regrows */
+export const PICKUP_RESPAWN_MIN = 35;
+export const PICKUP_RESPAWN_MAX = 90;
 
 export const AVATARS = ['😊', '😎', '🧑‍🔧', '👩‍🔧', '🧔', '🧒', '🦊', '🐱', '🐸', '🦉'];
 

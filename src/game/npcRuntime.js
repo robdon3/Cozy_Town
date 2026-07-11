@@ -1,7 +1,7 @@
-import { NPCS, PIPE_LEAKS, WORLD } from './data';
+import { NPC_MAX_HP, NPC_RESPAWN_MS, NPCS, PIPE_LEAKS, WORLD } from './data';
 
 /**
- * Live NPC positions (plumbers + Billy roam; others stay near home).
+ * Live NPC positions (plumbers + Billy + Emily roam; others stay near home).
  * Module-level so the simulation can run at 60fps without React re-renders.
  */
 
@@ -12,6 +12,7 @@ const BOUND = WORLD.half - 3;
  *   x: number, z: number, homeX: number, homeZ: number,
  *   tx: number, tz: number, speed: number, wait: number, bob: number,
  *   roam: number, wheelchair?: boolean,
+ *   hp: number, alive: boolean, respawnAt: number,
  *   job?: null | { type: 'leak', leakId: string, fixTimer: number }
  * }} NpcState
  */
@@ -29,7 +30,11 @@ export function setOpenLeaksSnapshot(ids) {
 function seed() {
   if (state.size) return;
   for (const n of NPCS) {
-    const canRoam = n.role === 'plumber' || n.role === 'billy' || n.wheelchair;
+    const canRoam =
+      n.role === 'plumber' ||
+      n.role === 'billy' ||
+      n.role === 'gardener' ||
+      n.wheelchair;
     const roam = canRoam ? (n.roamRadius ?? 10) : 0;
     state.set(n.id, {
       x: n.x,
@@ -44,6 +49,9 @@ function seed() {
       roam,
       wheelchair: Boolean(n.wheelchair),
       job: null,
+      hp: NPC_MAX_HP,
+      alive: true,
+      respawnAt: 0,
     });
   }
 }
@@ -62,9 +70,46 @@ export function getAllNpcPositions() {
   seed();
   const out = [];
   for (const [id, s] of state) {
-    out.push({ id, x: s.x, z: s.z, wheelchair: s.wheelchair });
+    out.push({
+      id,
+      x: s.x,
+      z: s.z,
+      wheelchair: s.wheelchair,
+      alive: s.alive,
+      hp: s.hp,
+    });
   }
   return out;
+}
+
+export function isNpcAlive(id) {
+  seed();
+  const s = state.get(id);
+  return s ? s.alive : true;
+}
+
+export function getNpcHp(id) {
+  seed();
+  return state.get(id)?.hp ?? NPC_MAX_HP;
+}
+
+/**
+ * Apply damage. Returns { killed, hp } or null if dead/missing.
+ */
+export function damageNpcRuntime(id, amount) {
+  seed();
+  const s = state.get(id);
+  if (!s || !s.alive) return null;
+  const dmg = Math.max(1, Math.round(amount));
+  s.hp = Math.max(0, s.hp - dmg);
+  if (s.hp <= 0) {
+    s.alive = false;
+    s.job = null;
+    s.respawnAt = Date.now() + NPC_RESPAWN_MS;
+    s.wait = 0;
+    return { killed: true, hp: 0 };
+  }
+  return { killed: false, hp: s.hp };
 }
 
 function pickTarget(s) {
@@ -88,50 +133,48 @@ function pickTarget(s) {
   s.tz = Math.max(-BOUND, Math.min(BOUND, tz));
 }
 
-function nearestOpenLeak(x, z) {
-  let best = null;
-  let bestD = Infinity;
-  for (const id of openLeaksSnap) {
-    const leak = PIPE_LEAKS.find((l) => l.id === id);
-    if (!leak) continue;
-    const d = Math.hypot(x - leak.x, z - leak.z);
-    if (d < bestD) {
-      bestD = d;
-      best = leak;
-    }
-  }
-  return best;
-}
-
-/** Leaks already claimed by an NPC job */
 function claimedLeaks() {
   const set = new Set();
   for (const s of state.values()) {
-    if (s.job?.type === 'leak') set.add(s.job.leakId);
+    if (s.alive && s.job?.type === 'leak') set.add(s.job.leakId);
   }
   return set;
 }
 
 /**
  * Advance all roaming NPCs. Call once per frame from R3F.
- * @param {number} dt
- * @param {{ onNpcFixLeak?: (leakId: string, npcId: number) => void }} [hooks]
  */
 export function tickNpcs(dt, hooks = {}) {
   seed();
   const step = Math.min(dt, 0.05);
   const claimed = claimedLeaks();
+  const now = Date.now();
 
   for (const [id, s] of state) {
+    // Respawn
+    if (!s.alive) {
+      if (now >= s.respawnAt) {
+        s.alive = true;
+        s.hp = NPC_MAX_HP;
+        s.x = s.homeX;
+        s.z = s.homeZ;
+        s.tx = s.homeX;
+        s.tz = s.homeZ;
+        s.job = null;
+        s.wait = 0.5;
+        pickTarget(s);
+        hooks.onNpcRespawn?.(id);
+      }
+      continue;
+    }
+
     const npc = NPCS.find((n) => n.id === id);
     const isPlumber = npc?.role === 'plumber';
 
-    // Plumbers: occasionally pick up a leak job
     if (isPlumber && !s.job && s.wait <= 0 && openLeaksSnap.length) {
       if (Math.random() < 0.012) {
         const free = openLeaksSnap.filter((lid) => !claimed.has(lid));
         if (free.length) {
-          // prefer nearer leaks
           let best = null;
           let bestD = Infinity;
           for (const lid of free) {
@@ -154,7 +197,6 @@ export function tickNpcs(dt, hooks = {}) {
       }
     }
 
-    // Job pathing: go to leak and fix
     if (s.job?.type === 'leak') {
       const leakStillOpen = openLeaksSnap.includes(s.job.leakId);
       if (!leakStillOpen) {
@@ -168,8 +210,7 @@ export function tickNpcs(dt, hooks = {}) {
           s.tz = leak.z;
           const dist = Math.hypot(leak.x - s.x, leak.z - s.z);
           if (dist < 1.2) {
-            s.fixTimer = (s.job.fixTimer || 0) + step;
-            s.job.fixTimer = s.fixTimer;
+            s.job.fixTimer = (s.job.fixTimer || 0) + step;
             s.bob += step * 8;
             if (s.job.fixTimer >= 2.4) {
               hooks.onNpcFixLeak?.(s.job.leakId, id);
@@ -211,11 +252,8 @@ export function tickNpcs(dt, hooks = {}) {
     const move = s.speed * step;
     s.x += (dx / dist) * move;
     s.z += (dz / dist) * move;
-    // wheelchair rolls smoother, less bob
     s.bob += step * (s.wheelchair ? 6 : 10);
   }
-
-  void nearestOpenLeak;
 }
 
 export function getNpcBob(id) {
@@ -226,7 +264,7 @@ export function getNpcBob(id) {
 export function isNpcWalking(id) {
   seed();
   const s = state.get(id);
-  if (!s || s.roam <= 0) return false;
+  if (!s || !s.alive || s.roam <= 0) return false;
   if (s.wait > 0 && !s.job) return false;
   if (s.job && Math.hypot(s.tx - s.x, s.tz - s.z) < 1.2) return false;
   return Math.hypot(s.tx - s.x, s.tz - s.z) > 0.4;
@@ -235,7 +273,7 @@ export function isNpcWalking(id) {
 export function isNpcFixing(id) {
   seed();
   const s = state.get(id);
-  if (!s?.job) return false;
+  if (!s?.alive || !s?.job) return false;
   return Math.hypot(s.tx - s.x, s.tz - s.z) < 1.2;
 }
 
@@ -245,7 +283,11 @@ export function initFromData() {
   for (const n of NPCS) {
     const s = state.get(n.id);
     if (!s) continue;
-    const canRoam = n.role === 'plumber' || n.role === 'billy' || n.wheelchair;
+    const canRoam =
+      n.role === 'plumber' ||
+      n.role === 'billy' ||
+      n.role === 'gardener' ||
+      n.wheelchair;
     if (canRoam) {
       s.roam = n.roamRadius ?? 11;
       s.speed = n.walkSpeed ?? 1.5 + (n.id % 5) * 0.15;

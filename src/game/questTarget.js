@@ -18,6 +18,9 @@ export function resolveQuestTarget(quest, { openLeaks = [] } = {}) {
   if (key === 'fish') return { ...buildingPos('dock'), label: quest.title };
   if (key === 'chop') return { ...buildingPos('forest'), label: quest.title };
   if (key === 'mine') return { ...buildingPos('mine'), label: quest.title };
+  if (key === 'garden' || key === 'pickup-5') {
+    return { ...buildingPos('emily-garden'), emoji: '🌷', label: quest.title };
+  }
   if (key === 'talk-nico') {
     const pos = getNpcPos(10);
     return { x: pos.x, z: pos.z, emoji: '🧑‍🔧', label: quest.title };

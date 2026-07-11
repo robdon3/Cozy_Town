@@ -37,10 +37,24 @@ export default function MultiplayerBridge() {
     const session = connectMultiplayer(roomCode, {
       onConnected: (code) => {
         setMpMeta({ status: 'live', selfPeerId: getSelfId() });
-        pushMessage('System', `You're in room ${code}. Friends can join with the invite link!`, true);
+        pushMessage(
+          'System',
+          `Room ${code} ready. Share the invite link — friends open it, pick a name, and Join. Same Wi‑Fi is easiest; cellular needs a moment for P2P.`,
+          true
+        );
         showToast(`Room ${code} live`);
-        // initial presence broadcast
         setTimeout(() => broadcastState(), 200);
+        setTimeout(() => broadcastState(), 1000);
+      },
+      onJoinError: (err) => {
+        const msg = err?.error || 'Could not connect multiplayer relays';
+        useGameStore.setState({ mpStatus: 'offline', mpError: String(msg) });
+        pushMessage(
+          'System',
+          `Multiplayer error: ${msg}. Try again, or check both players use the same room code.`,
+          true
+        );
+        showToast('Multiplayer connection issue');
       },
       onPeerJoin: (peerId) => {
         sfx.interact();

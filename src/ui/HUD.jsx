@@ -41,7 +41,9 @@ export default function HUD() {
   const buyItem = useGameStore((s) => s.buyItem);
   const setMutedStore = useGameStore((s) => s.setMuted);
   const resetProgress = useGameStore((s) => s.resetProgress);
+  const leaveToTitle = useGameStore((s) => s.leaveToTitle);
   const showToast = useGameStore((s) => s.showToast);
+  const mpError = useGameStore((s) => s.mpError);
   const sendChat = useGameStore((s) => s.sendChat);
   const equippedWeapon = useGameStore((s) => s.equippedWeapon);
   const setEquippedWeapon = useGameStore((s) => s.setEquippedWeapon);
@@ -171,11 +173,13 @@ export default function HUD() {
   const mpLabel =
     !roomCode
       ? null
-      : mpStatus === 'connecting'
-        ? 'Connecting…'
-        : mpStatus === 'live'
-          ? `${peerCount} online`
-          : 'Offline';
+      : mpError
+        ? 'Error'
+        : mpStatus === 'connecting'
+          ? 'Connecting…'
+          : mpStatus === 'live'
+            ? `${peerCount} friend${peerCount === 1 ? '' : 's'}`
+            : 'Offline';
 
   return (
     <div className="hud">
@@ -374,6 +378,20 @@ export default function HUD() {
           >
             ⚙️ Settings
           </button>
+          <button
+            onClick={() => {
+              if (
+                window.confirm(
+                  'Leave to the title screen so you can join a new room with friends? Progress stays on this device.'
+                )
+              ) {
+                closePanels();
+                leaveToTitle({ clearRoom: true });
+              }
+            }}
+          >
+            🏠 Leave / new room
+          </button>
         </div>
       )}
 
@@ -558,15 +576,36 @@ export default function HUD() {
               <>
                 <br />
                 Multiplayer room <strong>{roomCode}</strong> · {mpLabel}
+                {mpError && (
+                  <>
+                    <br />
+                    <span style={{ color: '#ff8a8a', fontSize: 13 }}>{mpError}</span>
+                  </>
+                )}
               </>
             ) : (
               <>
                 <br />
-                Mode: Solo
+                Mode: Solo — open Invite or Leave to title to join friends
               </>
             )}
           </p>
           <div className="btn-row">
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    'Leave to the title screen? Your profile stays saved on this device so you can create or join a new room with friends.'
+                  )
+                ) {
+                  closePanels();
+                  leaveToTitle({ clearRoom: true });
+                }
+              }}
+            >
+              🏠 Leave to title / new room
+            </button>
             <button className="btn btn-secondary" onClick={toggleMute}>
               {muted ? 'Unmute sound' : 'Mute sound'}
             </button>

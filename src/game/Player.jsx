@@ -156,8 +156,15 @@ export default function Player({ cameraTarget }) {
     posSync.current += dt;
     if (posSync.current > 0.1) {
       posSync.current = 0;
-      setPlayerPos(group.current.position.x, group.current.position.z);
-      updateNearby(group.current.position.x, group.current.position.z);
+      const px = group.current.position.x;
+      const pz = group.current.position.z;
+      setPlayerPos(px, pz);
+      updateNearby(px, pz);
+      // Auto-pick flowers/mushrooms when you walk over them
+      const st = useGameStore.getState();
+      if (st.nearby?.type === 'pickup' && st.nearby.id) {
+        st.collectPickup(st.nearby.id);
+      }
     }
 
     saveTick.current = (saveTick.current || 0) + dt;

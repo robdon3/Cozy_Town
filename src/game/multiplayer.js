@@ -1,8 +1,12 @@
-import { joinRoom, selfId } from 'trystero';
+/**
+ * Live multiplayer via Trystero (WebRTC P2P).
+ * Uses the BitTorrent strategy — more reliable for casual friend rooms than Nostr alone.
+ */
+import { joinRoom, selfId } from '@trystero-p2p/torrent';
 
-const APP_ID = 'cozy-town-robdon3-v1';
+const APP_ID = 'cozy-town-robdon3-v2';
 
-/** @type {null | ReturnType<typeof createSession>} */
+/** @type {null | ReturnType<typeof createSessionShape>} */
 let session = null;
 
 export function getSelfId() {
@@ -39,29 +43,70 @@ export function roomInviteUrl(roomCode) {
   return `${base}?room=${encodeURIComponent(roomCode)}`;
 }
 
+export function clearRoomFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('room');
+    url.searchParams.delete('r');
+    window.history.replaceState({}, '', url.toString());
+  } catch {
+    /* ignore */
+  }
+}
+
+export function setRoomInUrl(roomCode) {
+  try {
+    const url = new URL(window.location.href);
+    if (roomCode) {
+      url.searchParams.set('room', roomCode);
+    } else {
+      url.searchParams.delete('room');
+      url.searchParams.delete('r');
+    }
+    window.history.replaceState({}, '', url.toString());
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
- * Connect to a P2P room. Returns controls or null on failure.
+ * Connect to a P2P room. Returns session controls or null.
  */
 export function connectMultiplayer(roomCode, handlers = {}) {
   disconnectMultiplayer();
 
   const code = normalizeRoomCode(roomCode);
-  if (!code) return null;
+  if (!code || code.length < 4) return null;
 
-  const room = joinRoom(
-    {
-      appId: APP_ID,
-      // public STUN helps NAT traversal for friends on different networks
-      rtcConfig: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-        ],
+  let room;
+  try {
+    room = joinRoom(
+      {
+        appId: APP_ID,
+        // STUN helps friends on different home networks find each other
+        rtcConfig: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun.cloudflare.com:3478' },
+          ],
+        },
       },
-    },
-    `room-${code}`
-  );
+      `cozy-${code}`,
+      {
+        onJoinError: (err) => {
+          console.warn('[cozy-mp] join error', err);
+          handlers.onJoinError?.(err);
+        },
+      }
+    );
+  } catch (err) {
+    console.warn('[cozy-mp] joinRoom threw', err);
+    handlers.onJoinError?.({ error: String(err?.message || err) });
+    return null;
+  }
 
+  // Trystero 0.25+: makeAction returns { send, onMessage, ... }
   const stateAction = room.makeAction('pstate');
   const chatAction = room.makeAction('pchat');
   const emoteAction = room.makeAction('pemote');
@@ -70,7 +115,6 @@ export function connectMultiplayer(roomCode, handlers = {}) {
 
   room.onPeerJoin = (peerId) => {
     handlers.onPeerJoin?.(peerId);
-    // greet new peer with our latest snapshot if we have one
     if (session?.lastState) {
       stateAction.send(session.lastState, { target: peerId }).catch(() => {});
     }
@@ -110,6 +154,7 @@ export function connectMultiplayer(roomCode, handlers = {}) {
     code,
     lastState: null,
     sendState(state) {
+      if (!session) return Promise.resolve();
       session.lastState = state;
       return stateAction.send(state).catch(() => {});
     },
@@ -129,7 +174,11 @@ export function connectMultiplayer(roomCode, handlers = {}) {
       return room.leave().catch(() => {});
     },
     peerCount() {
-      return Object.keys(room.getPeers()).length;
+      try {
+        return Object.keys(room.getPeers()).length;
+      } catch {
+        return 0;
+      }
     },
   };
 
@@ -145,9 +194,13 @@ export function disconnectMultiplayer() {
   if (!session) return;
   const s = session;
   session = null;
-  s.leave();
+  try {
+    s.leave();
+  } catch {
+    /* ignore */
+  }
 }
 
-function createSession() {
+function createSessionShape() {
   return session;
 }

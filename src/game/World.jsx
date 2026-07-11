@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { Billboard } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
-import { BUILDINGS, NPCS, PIPE_LEAKS, WORLD } from './data';
+import { BUILDINGS, GROUND_PICKUPS, NPCS, PIPE_LEAKS, WORLD } from './data';
 import {
   getNpcBob,
+  getNpcHp,
   getNpcPos,
   initFromData,
+  isNpcAlive,
   isNpcFixing,
   isNpcWalking,
   setOpenLeaksSnapshot,
@@ -138,6 +140,14 @@ function Building({ data }) {
             [-2, 0, 3],
             [3, 0, -3],
           ].map((p, i) => <Tree key={i} position={p} />)}
+        {data.id === 'emily-garden' &&
+          [
+            [-5, 0, -3],
+            [5, 0, -2],
+            [-4, 0, 3],
+            [4, 0, 3.5],
+            [0, 0, -4],
+          ].map((p, i) => <Tree key={`g${i}`} position={p} />)}
       </group>
     );
   }
@@ -205,11 +215,15 @@ function NpcSprite({ npc }) {
 
   useFrame(() => {
     if (!group.current) return;
+    if (!isNpcAlive(npc.id)) {
+      group.current.visible = false;
+      return;
+    }
+    group.current.visible = true;
     const { x, z } = getNpcPos(npc.id);
     const bob = getNpcBob(npc.id);
     const walking = isNpcWalking(npc.id);
     const fixing = isNpcFixing(npc.id);
-    // wheelchair: low smooth roll; standing: walk bob
     let y = 0;
     if (npc.wheelchair) {
       y = walking ? Math.abs(Math.sin(bob)) * 0.04 : 0;
@@ -220,6 +234,12 @@ function NpcSprite({ npc }) {
     group.current.position.set(x, y, z);
     const sc = walking ? 1 + Math.sin(bob) * 0.04 : 1;
     group.current.scale.setScalar(sc);
+    // flash red when low HP
+    const hp = getNpcHp(npc.id);
+    const mat = group.current.userData?.spriteMat;
+    if (mat) {
+      mat.color.set(hp < 25 ? '#ff8888' : '#ffffff');
+    }
   });
 
   return (
@@ -255,7 +275,14 @@ function NpcSprite({ npc }) {
       )}
       <Billboard position={[0, npc.wheelchair ? 1.35 : 1.15, 0]} follow lockX={false} lockZ={false}>
         <sprite scale={[1.8, 1.8, 1]}>
-          <spriteMaterial map={tex} transparent depthWrite={false} />
+          <spriteMaterial
+            map={tex}
+            transparent
+            depthWrite={false}
+            ref={(m) => {
+              if (group.current) group.current.userData.spriteMat = m;
+            }}
+          />
         </sprite>
       </Billboard>
       <Billboard position={[0, npc.wheelchair ? 2.55 : 2.4, 0]}>
@@ -289,14 +316,52 @@ function NpcDirector() {
     if (st.interiorId) return;
     setOpenLeaksSnapshot(st.openLeaks);
     st.tickLeaks();
+    st.tickPickups();
     tickNpcs(dt, {
       onNpcFixLeak: (leakId) => {
         useGameStore.getState().sealLeak(leakId, { by: 'npc' });
+      },
+      onNpcRespawn: (npcId) => {
+        const npc = NPCS.find((n) => n.id === npcId);
+        if (npc) {
+          useGameStore
+            .getState()
+            .pushMessage('System', `${npc.name} is back on their feet! ✨`, true);
+        }
       },
     });
   });
 
   return null;
+}
+
+function GroundPickup({ item }) {
+  const collected = useGameStore((s) => s.collectedPickups.includes(item.id));
+  const bob = useRef(Math.random() * 10);
+  const group = useRef();
+  const tex = useMemo(() => createEmojiTexture(item.emoji, 96), [item.emoji]);
+
+  useFrame((_, dt) => {
+    if (!group.current || collected) return;
+    bob.current += dt * 2.4;
+    group.current.position.y = 0.35 + Math.sin(bob.current) * 0.08;
+  });
+
+  if (collected) return null;
+
+  return (
+    <group ref={group} position={[item.x, 0.35, item.z]}>
+      <Billboard>
+        <sprite scale={[0.85, 0.85, 1]}>
+          <spriteMaterial map={tex} transparent depthWrite={false} />
+        </sprite>
+      </Billboard>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.3, 0]}>
+        <circleGeometry args={[0.28, 12]} />
+        <meshStandardMaterial color="#f6c453" transparent opacity={0.25} />
+      </mesh>
+    </group>
+  );
 }
 
 function Decorations() {
@@ -307,10 +372,10 @@ function Decorations() {
       const r = 12 + Math.random() * 26;
       const x = Math.cos(a) * r;
       const z = Math.sin(a) * r;
-      // keep paths clear-ish
       if (Math.abs(x) < 3 || Math.abs(z) < 3) continue;
-      // avoid water
       if (x < -20 && z > 18) continue;
+      // leave Emily's Garden open
+      if (x > -15 && x < -1 && z > -34 && z < -22) continue;
       pts.push([x, 0, z]);
     }
     return pts;
@@ -327,13 +392,6 @@ function Decorations() {
     });
   }, []);
 
-  const flowers = useMemo(() => {
-    return Array.from({ length: 30 }, () => ({
-      p: [(Math.random() - 0.5) * 50, 0.4, (Math.random() - 0.5) * 50],
-      e: ['🌸', '🌺', '🌼', '🌻', '🍄'][Math.floor(Math.random() * 5)],
-    }));
-  }, []);
-
   return (
     <group>
       {trees.map((p, i) => (
@@ -342,8 +400,8 @@ function Decorations() {
       {rocks.map((r, i) => (
         <Rock key={`r${i}`} position={r.p} scale={r.s} />
       ))}
-      {flowers.map((f, i) => (
-        <Flower key={`f${i}`} position={f.p} emoji={f.e} />
+      {GROUND_PICKUPS.map((item) => (
+        <GroundPickup key={item.id} item={item} />
       ))}
     </group>
   );
@@ -448,17 +506,6 @@ function PipeLeak({ leak }) {
         </sprite>
       </Billboard>
     </group>
-  );
-}
-
-function Flower({ position, emoji }) {
-  const tex = useMemo(() => createEmojiTexture(emoji, 64), [emoji]);
-  return (
-    <Billboard position={position}>
-      <sprite scale={[0.7, 0.7, 1]}>
-        <spriteMaterial map={tex} transparent depthWrite={false} />
-      </sprite>
-    </Billboard>
   );
 }
 
