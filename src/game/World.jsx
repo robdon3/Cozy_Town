@@ -1,10 +1,16 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { BUILDINGS, NPCS, PIPE_LEAKS, WORLD } from './data';
-import { createCharacterTexture, createEmojiTexture, createLabelTexture } from './sprites';
 import { Billboard } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
-import { useRef } from 'react';
+import { BUILDINGS, NPCS, PIPE_LEAKS, WORLD } from './data';
+import {
+  getNpcBob,
+  getNpcPos,
+  initFromData,
+  isNpcWalking,
+  tickNpcs,
+} from './npcRuntime';
+import { createCharacterTexture, createEmojiTexture, createLabelTexture } from './sprites';
 import { useGameStore } from './store';
 
 function Ground() {
@@ -173,29 +179,40 @@ function Building({ data }) {
 }
 
 function NpcSprite({ npc }) {
+  const group = useRef();
   const tex = useMemo(
     () => createCharacterTexture(npc.emoji, npc.color),
     [npc.emoji, npc.color]
   );
-  const labelText =
-    npc.role === 'plumber'
-      ? `🔧 ${npc.name}`
-      : npc.name;
+  const labelText = npc.role === 'plumber' ? `🔧 ${npc.name}` : npc.name;
   const label = useMemo(() => createLabelTexture(labelText), [labelText]);
   const titleTex = useMemo(
     () => (npc.title ? createLabelTexture(npc.title, 'rgba(40,70,120,0.88)') : null),
     [npc.title]
   );
+  const canRoam = npc.role === 'plumber';
+
+  useFrame(() => {
+    if (!group.current) return;
+    const { x, z } = getNpcPos(npc.id);
+    const bob = getNpcBob(npc.id);
+    const walking = isNpcWalking(npc.id);
+    const y = walking ? Math.abs(Math.sin(bob)) * 0.14 : Math.sin(bob) * 0.03;
+    group.current.position.set(x, y, z);
+    // subtle scale bounce while walking
+    const sc = walking ? 1 + Math.sin(bob) * 0.04 : 1;
+    group.current.scale.setScalar(sc);
+  });
 
   return (
-    <group position={[npc.x, 0, npc.z]}>
+    <group ref={group} position={[npc.x, 0, npc.z]}>
       <Billboard position={[0, 1.15, 0]} follow lockX={false} lockZ={false}>
         <sprite scale={[1.8, 1.8, 1]}>
           <spriteMaterial map={tex} transparent depthWrite={false} />
         </sprite>
       </Billboard>
       <Billboard position={[0, 2.4, 0]}>
-        <sprite scale={[npc.role === 'plumber' ? 3.0 : 2.4, 0.6, 1]}>
+        <sprite scale={[canRoam ? 3.0 : 2.4, 0.6, 1]}>
           <spriteMaterial map={label} transparent depthWrite={false} />
         </sprite>
       </Billboard>
@@ -212,6 +229,19 @@ function NpcSprite({ npc }) {
       </mesh>
     </group>
   );
+}
+
+/** Single frame tick for all roaming NPCs */
+function NpcDirector() {
+  useEffect(() => {
+    initFromData();
+  }, []);
+
+  useFrame((_, dt) => {
+    tickNpcs(dt);
+  });
+
+  return null;
 }
 
 function Decorations() {
@@ -399,6 +429,7 @@ export default function World() {
       {BUILDINGS.map((b) => (
         <Building key={b.id} data={b} />
       ))}
+      <NpcDirector />
       {NPCS.map((n) => (
         <NpcSprite key={n.id} npc={n} />
       ))}

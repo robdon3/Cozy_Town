@@ -12,6 +12,7 @@ import {
 } from './data';
 import { sfx } from '../audio/sounds';
 import { getLookBasis } from './lookState';
+import { getNpcPos } from './npcRuntime';
 
 const SAVE_KEY = 'cozy-town-v3';
 
@@ -299,7 +300,8 @@ export const useGameStore = create((set, get) => ({
     }
 
     for (const n of NPCS) {
-      const dist = Math.hypot(px - n.x, pz - n.z);
+      const pos = getNpcPos(n.id);
+      const dist = Math.hypot(px - pos.x, pz - pos.z);
       if (dist < bestDist) {
         bestDist = dist;
         best = {
@@ -307,7 +309,7 @@ export const useGameStore = create((set, get) => ({
           id: n.id,
           name: n.name,
           emoji: n.emoji,
-          action: n.role === 'plumber' ? 'Talk' : 'Talk',
+          action: 'Talk',
           dialogue: n.dialogue,
           role: n.role,
           title: n.title,

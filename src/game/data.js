@@ -180,7 +180,7 @@ export const NPCS = [
     action: 'Talk',
     dialogue: 'Need lumber? The forest always has more trees. Tell Nico I said hi!',
   },
-  // —— Plumber crew ——
+  // —— Plumber crew (roam around town near their posts) ——
   {
     id: 10,
     name: 'Nico “The Wrench”',
@@ -190,6 +190,8 @@ export const NPCS = [
     color: '#5B8DEF',
     role: 'plumber',
     title: 'Crew Boss',
+    roamRadius: 14,
+    walkSpeed: 1.7,
     action: 'Talk',
     dialogue:
       'Kalimera! I’m Nico, boss of the plumber crew. Fix the leaking pipes around town — talk to the crew and use Fix Pipe at the leaks!',
@@ -198,6 +200,7 @@ export const NPCS = [
       'Leaks pop up near the fountain, cafe, dock, and HQ. Fix them for coins!',
       'Need firepower? Sam sells a Plumber Blaster and Wrench Grenades. Pure chaos. Pure fun.',
       'A good plumber listens to the pipes… and never loses their wrench.',
+      'I walk the whole town checking pressure — catch me when you can!',
     ],
   },
   {
@@ -209,12 +212,15 @@ export const NPCS = [
     color: '#7EB6FF',
     role: 'plumber',
     title: 'Pipe Whisperer',
+    roamRadius: 9,
+    walkSpeed: 1.4,
     action: 'Talk',
     dialogue: 'This fountain spring is a drama queen. Stand close to the leak and hit Fix Pipe!',
     dialogues: [
       'Yiannis here — I talk to pipes. They talk back.',
       'Fountain leak is right here. Fix it before the park becomes a pool!',
       'Pressure is poetry. Also, don’t grenade the main valve. Please.',
+      'I patrol the square — if you miss me, wait by the fountain.',
     ],
   },
   {
@@ -226,12 +232,15 @@ export const NPCS = [
     color: '#FF9ECD',
     role: 'plumber',
     title: 'Junior Ace',
+    roamRadius: 10,
+    walkSpeed: 2.0,
     action: 'Talk',
     dialogue: 'Sofia! Cafe pipes are my beat. Grab a wrench energy and fix the leak by the kitchen wall.',
     dialogues: [
       'Hey! Sofia — junior ace of the crew.',
       'Cafe leak is behind Luna’s place. Fix Pipe when you’re close!',
       'Coffee + plumbing = the Cozy Town dream.',
+      'I’m usually jogging between the cafe and HQ — wave if you see me!',
     ],
   },
   {
@@ -243,12 +252,15 @@ export const NPCS = [
     color: '#FFB347',
     role: 'plumber',
     title: 'Dock Specialist',
+    roamRadius: 8,
+    walkSpeed: 1.5,
     action: 'Talk',
     dialogue: 'Dimitri at your service! Dock pipes freeze, crack, then party. Fix the leak on the pier.',
     dialogues: [
       'Dimitri — dock pipes, storms, and snacks.',
       'Pier leak is right by the water. One Fix Pipe and we’re golden.',
       'Between you and me, the blaster is great for “persuading” stubborn valves. Wink.',
+      'I stick near the waterfront. Salt air is good for the soul.',
     ],
   },
   {
@@ -260,12 +272,15 @@ export const NPCS = [
     color: '#C3A6FF',
     role: 'plumber',
     title: 'Demo & Drama',
+    roamRadius: 12,
+    walkSpeed: 1.85,
     action: 'Talk',
     dialogue: 'Elena. I handle “controlled demolitions”… I mean pressure releases. Wrench Grenades go boom, pipes go calm.',
     dialogues: [
       'Elena — demo specialist. Mostly jokes. Mostly.',
       'HQ side leak needs a hero. Fix Pipe, then maybe toss a grenade at a rock for fun.',
       'Look around with right-drag or the look stick. You’ll see my handiwork everywhere.',
+      'If I’m walking, I’m thinking. If I’m running, something exploded. Probably fine.',
     ],
   },
 ];

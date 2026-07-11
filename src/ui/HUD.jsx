@@ -5,6 +5,7 @@ import Joystick from './Joystick';
 import LookStick from './LookStick';
 import { sfx, setMuted as setAudioMuted, startMusic, stopMusic } from '../audio/sounds';
 import { roomInviteUrl } from '../game/multiplayer';
+import { getNpcPos } from '../game/npcRuntime';
 
 function MiniMap() {
   const canvasRef = useRef(null);
@@ -31,8 +32,9 @@ function MiniMap() {
     });
 
     NPCS.filter((n) => n.role === 'plumber').forEach((n) => {
+      const pos = getNpcPos(n.id);
       ctx.fillStyle = '#5B8DEF';
-      ctx.fillRect(sx(n.x) - 2, sy(n.z) - 2, 4, 4);
+      ctx.fillRect(sx(pos.x) - 2, sy(pos.z) - 2, 4, 4);
     });
 
     PIPE_LEAKS.forEach((leak) => {

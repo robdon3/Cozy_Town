@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { NPCS, WEAPONS, WORLD } from './data';
 import { getLookBasis } from './lookState';
+import { getNpcPos } from './npcRuntime';
 import { useGameStore } from './store';
 import { sfx } from '../audio/sounds';
 
@@ -81,7 +82,8 @@ export default function Projectiles() {
         p.life -= dt;
 
         for (const npc of NPCS) {
-          const d = Math.hypot(p.x - npc.x, p.z - npc.z);
+          const pos = getNpcPos(npc.id);
+          const d = Math.hypot(p.x - pos.x, p.z - pos.z);
           if (d < 1.35 && p.y < 2.6) {
             const last = hitCooldown.current.get(npc.id) || 0;
             if (Date.now() - last > 750) {
@@ -129,7 +131,8 @@ export default function Projectiles() {
           showToast('💥 Boom!');
           emitBoom(p.x, p.y, p.z);
           for (const npc of NPCS) {
-            if (Math.hypot(p.x - npc.x, p.z - npc.z) < WEAPONS.grenade.radius) {
+            const pos = getNpcPos(npc.id);
+            if (Math.hypot(p.x - pos.x, p.z - pos.z) < WEAPONS.grenade.radius) {
               onNpcHit(npc.id);
             }
           }
