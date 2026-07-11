@@ -469,13 +469,33 @@ export default function HUD() {
             <button
               className="btn btn-secondary"
               onClick={() => {
-                if (window.confirm('Reset all progress?')) {
+                if (
+                  window.confirm(
+                    'Reset this world? Leaks, quests, inventory, and ammo will refresh. You’ll stay in-game.'
+                  )
+                ) {
                   resetProgress();
                   closePanels();
                 }
               }}
             >
-              Reset progress
+              Reset world
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    'Hard reload the latest game from the server? Clears cache + saves and refreshes the page.'
+                  )
+                ) {
+                  import('../game/resetWorld').then(({ hardResetWorldAndReload }) =>
+                    hardResetWorldAndReload({ keepRoom: Boolean(roomCode) })
+                  );
+                }
+              }}
+            >
+              Reload latest build
             </button>
           </div>
         </Modal>

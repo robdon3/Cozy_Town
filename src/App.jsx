@@ -5,11 +5,26 @@ import HUD from './ui/HUD';
 import TitleScreen from './ui/TitleScreen';
 import { useGameStore } from './game/store';
 import { setMuted, unlockAudio } from './audio/sounds';
+import { GAME_VERSION } from './game/version';
 
 export default function App() {
   const started = useGameStore((s) => s.started);
   const muted = useGameStore((s) => s.muted);
   const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    // Drop stale service workers from older CRA/PWA builds
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((r) => r.unregister());
+      });
+    }
+    try {
+      document.documentElement.dataset.gameVersion = GAME_VERSION;
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     setMuted(muted);

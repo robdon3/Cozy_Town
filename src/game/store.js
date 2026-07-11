@@ -637,16 +637,32 @@ export const useGameStore = create((set, get) => ({
   resetProgress() {
     const name = get().player.name;
     const avatar = get().player.avatar;
-    localStorage.removeItem(SAVE_KEY);
+    try {
+      localStorage.removeItem(SAVE_KEY);
+      localStorage.removeItem('cozy-town-v2');
+    } catch {
+      /* ignore */
+    }
     set({
-      player: { ...defaultPlayer(), name, avatar },
+      player: { ...defaultPlayer(), name, avatar, x: 0, z: 0 },
       completedQuests: [],
       fixedLeaks: [],
+      projectiles: [],
+      explosions: [],
+      fireRequest: null,
+      nearby: null,
+      npcDialogueIndex: {},
       messages: [
-        { id: Date.now(), sender: 'System', text: 'Progress reset. Fresh start!', system: true },
+        {
+          id: Date.now(),
+          sender: 'System',
+          text: 'World reset! Leaks are back, inventory cleared. 🔧',
+          system: true,
+        },
       ],
     });
     get().save();
+    get().showToast('World reset');
   },
 }));
 

@@ -3,33 +3,45 @@ import { AVATARS } from '../game/data';
 import { useGameStore } from '../game/store';
 import { unlockAudio, startMusic, sfx } from '../audio/sounds';
 import { makeRoomCode, normalizeRoomCode, parseRoomFromUrl } from '../game/multiplayer';
+import { hardResetWorldAndReload } from '../game/resetWorld';
+import { GAME_BUILD_LABEL, GAME_VERSION } from '../game/version';
 
 export default function TitleScreen() {
   const player = useGameStore((s) => s.player);
   const startGame = useGameStore((s) => s.startGame);
+  const resetProgress = useGameStore((s) => s.resetProgress);
   const [name, setName] = useState(player.name || 'Explorer');
   const [avatar, setAvatar] = useState(player.avatar || AVATARS[0]);
   const inviteRoom = useMemo(() => parseRoomFromUrl(), []);
   const [joinCode, setJoinCode] = useState(inviteRoom || '');
   const [busy, setBusy] = useState(false);
+  const [freshWorld, setFreshWorld] = useState(true);
 
   const enter = async (roomCode) => {
     if (busy) return;
     setBusy(true);
-    await unlockAudio();
-    sfx.quest();
-    startMusic();
-    startGame(name, avatar, { roomCode: roomCode || null });
+    try {
+      if (freshWorld) {
+        resetProgress();
+      }
+      await unlockAudio();
+      sfx.quest();
+      startMusic();
+      startGame(name, avatar, { roomCode: roomCode || null });
+    } catch {
+      setBusy(false);
+      sfx.error();
+    }
   };
 
   const playSolo = () => enter(null);
 
   const createRoom = () => {
     const code = makeRoomCode();
-    // put room in URL so refresh / share stays in-room
     try {
       const url = new URL(window.location.href);
       url.searchParams.set('room', code);
+      url.searchParams.set('v', GAME_VERSION);
       window.history.replaceState({}, '', url.toString());
     } catch {
       /* ignore */
@@ -46,6 +58,7 @@ export default function TitleScreen() {
     try {
       const url = new URL(window.location.href);
       url.searchParams.set('room', code);
+      url.searchParams.set('v', GAME_VERSION);
       window.history.replaceState({}, '', url.toString());
     } catch {
       /* ignore */
@@ -53,12 +66,18 @@ export default function TitleScreen() {
     enter(code);
   };
 
+  const forceLatest = () => {
+    sfx.click();
+    hardResetWorldAndReload({ keepRoom: Boolean(inviteRoom) });
+  };
+
   return (
     <div className="title-screen">
       <div className="title-card">
         <div style={{ fontSize: 56, marginBottom: 8 }}>🏡</div>
         <h1>Cozy Town</h1>
-        <p className="tagline">3D town · live multiplayer · share with friends</p>
+        <p className="tagline">3D town · plumbers · multiplayer · blasters</p>
+        <div className="version-badge">{GAME_BUILD_LABEL}</div>
 
         {inviteRoom ? (
           <div className="invite-banner">
@@ -95,6 +114,20 @@ export default function TitleScreen() {
           </div>
         </div>
 
+        <label className="fresh-toggle">
+          <input
+            type="checkbox"
+            checked={freshWorld}
+            onChange={(e) => {
+              sfx.click();
+              setFreshWorld(e.target.checked);
+            }}
+          />
+          <span>
+            <strong>Fresh world</strong> — reset leaks, quests, inventory &amp; spawn when you play
+          </span>
+        </label>
+
         <div className="controls-help">
           <div>
             <strong>Move:</strong> WASD / arrows or right joystick
@@ -103,13 +136,13 @@ export default function TitleScreen() {
             <strong>Look:</strong> drag screen / look stick / Q·E
           </div>
           <div>
-            <strong>Plumbers:</strong> talk to Nico&apos;s crew · Fix Pipe at 💧 leaks
+            <strong>Plumbers:</strong> Nico&apos;s crew at Pipeworks HQ · Fix 💧 leaks
           </div>
           <div>
-            <strong>Fun:</strong> 🔫 blaster (F / Fire) · 💣 grenades · shop for ammo
+            <strong>Fun:</strong> 🔫 blaster · 💣 grenades · shop for ammo
           </div>
           <div>
-            <strong>Multiplayer:</strong> create/join a room and share the invite link
+            <strong>Stuck on an old build?</strong> use “Reload latest” below
           </div>
         </div>
 
@@ -140,11 +173,26 @@ export default function TitleScreen() {
                 if (e.key === 'Enter') joinRoom();
               }}
             />
-            <button className="btn btn-primary" style={{ flex: '0 0 auto' }} disabled={busy} onClick={joinRoom}>
+            <button
+              className="btn btn-primary"
+              style={{ flex: '0 0 auto' }}
+              disabled={busy}
+              onClick={joinRoom}
+            >
               Join
             </button>
           </div>
         </div>
+
+        <div className="btn-row" style={{ marginTop: 4 }}>
+          <button className="btn btn-secondary" type="button" onClick={forceLatest}>
+            🔄 Reload latest (clear cache &amp; saves)
+          </button>
+        </div>
+        <p className="reset-hint">
+          Opens a clean copy of the game (fixes “stuck on old version”). Official URL:{' '}
+          <span className="mono">robdon3.github.io/Cozy_Town/</span>
+        </p>
       </div>
     </div>
   );
