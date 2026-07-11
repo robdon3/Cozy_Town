@@ -51,9 +51,16 @@ export default function HUD() {
   const [chatExpanded, setChatExpanded] = useState(false);
   const [flashVisible, setFlashVisible] = useState(false);
   const [flashHiding, setFlashHiding] = useState(false);
+  const [showControlsHint, setShowControlsHint] = useState(true);
   const chatLogRef = useRef(null);
   const lastMsgId = useRef(null);
   const flashTimer = useRef(null);
+
+  // Hide generic controls tip after a few seconds
+  useEffect(() => {
+    const t = setTimeout(() => setShowControlsHint(false), 8000);
+    return () => clearTimeout(t);
+  }, []);
 
   const latestMsg = messages.length ? messages[messages.length - 1] : null;
   const visibleLog = messages.slice(-8);
@@ -169,8 +176,9 @@ export default function HUD() {
 
   return (
     <div className="hud">
-      <div className="hud-top">
-        <div className="top-bar">
+      {/* Top chrome: slim stats left · actions + map right */}
+      <div className="hud-chrome">
+        <div className="hud-top-row">
           <div className="stat-pills">
             <div className="pill">
               <span className="icon">💰</span>
@@ -189,62 +197,61 @@ export default function HUD() {
                 <div className="energy-fill" style={{ width: `${player.energy}%` }} />
               </div>
             </div>
-            {roomCode && (
-              <div className={`pill mp-pill ${mpStatus}`}>
-                <span className="icon">🟢</span>
-                <span className="room-code">{roomCode}</span>
-                <span className="mp-meta">{mpLabel}</span>
-              </div>
-            )}
-            <div className="pill" title="Leaking pipes left">
-              <span className="icon">💧</span>
-              {leaksLeft}
-            </div>
-            <div className="pill" title="Blaster ammo">
-              <span className="icon">🔫</span>
-              {player.ammo ?? 0}
-            </div>
-            <div className="pill" title="Grenades">
-              <span className="icon">💣</span>
-              {player.grenades ?? 0}
-            </div>
           </div>
-          <div className="top-bar-actions">
-            <button className="icon-btn" onClick={share} title="Share invite">
-              📤
-            </button>
-            <button
-              className={`icon-btn ${chatExpanded || panels.chat ? 'active' : ''}`}
-              onClick={() => {
-                if (chatExpanded || panels.chat) closeChat();
-                else openChat();
-              }}
-              title="Chat"
-            >
-              💬
-            </button>
-            <button
-              className={`icon-btn ${muted ? 'active' : ''}`}
-              onClick={toggleMute}
-              title="Sound"
-            >
-              {muted ? '🔇' : '🔊'}
-            </button>
-            <button
-              className={`icon-btn ${panels.menu ? 'active' : ''}`}
-              onClick={() => togglePanel('menu')}
-              title="Menu"
-            >
-              ☰
-            </button>
+
+          <div className="hud-top-right">
+            <div className="top-bar-actions">
+              <button className="icon-btn" onClick={share} title="Share invite">
+                📤
+              </button>
+              <button
+                className={`icon-btn ${chatExpanded || panels.chat ? 'active' : ''}`}
+                onClick={() => {
+                  if (chatExpanded || panels.chat) closeChat();
+                  else openChat();
+                }}
+                title="Chat"
+              >
+                💬
+              </button>
+              <button
+                className={`icon-btn ${muted ? 'active' : ''}`}
+                onClick={toggleMute}
+                title="Sound"
+              >
+                {muted ? '🔇' : '🔊'}
+              </button>
+              <button
+                className={`icon-btn ${panels.menu ? 'active' : ''}`}
+                onClick={() => togglePanel('menu')}
+                title="Menu"
+              >
+                ☰
+              </button>
+            </div>
+            <MiniMap />
           </div>
         </div>
 
-      </div>
+        {(roomCode || leaksLeft > 0) && (
+          <div className="hud-chips">
+            {roomCode && (
+              <div className={`chip mp-chip ${mpStatus}`}>
+                <span>🟢</span>
+                <span className="room-code">{roomCode}</span>
+                {mpLabel && <span className="mp-meta">{mpLabel}</span>}
+              </div>
+            )}
+            {leaksLeft > 0 && (
+              <div className="chip" title="Leaks left">
+                💧 {leaksLeft}
+              </div>
+            )}
+          </div>
+        )}
 
-      {/* Always visible — top-right, above menu */}
-      <MiniMap />
-      <QuestCompass />
+        <QuestCompass />
+      </div>
 
       <div className="chat-dock">
         {chatExpanded || panels.chat ? (
@@ -344,46 +351,52 @@ export default function HUD() {
         </div>
       )}
 
-      <div className="hint">
-        {nearby
-          ? `Near ${nearby.emoji} ${nearby.name}${nearby.title ? ` · ${nearby.title}` : ''} — ${nearby.action} (Space)`
-          : 'Drag to look · Q/E orbit · F fire · 1 blaster / 2 grenade · Space interact'}
-      </div>
-
-      <LookStick />
-
-      <div className="weapon-bar">
-        <button
-          type="button"
-          className={`weapon-slot ${equippedWeapon === 'gun' ? 'active' : ''}`}
-          onClick={() => setEquippedWeapon('gun')}
-        >
-          <span>🔫</span>
-          <small>1</small>
-        </button>
-        <button
-          type="button"
-          className={`weapon-slot ${equippedWeapon === 'grenade' ? 'active' : ''}`}
-          onClick={() => setEquippedWeapon('grenade')}
-        >
-          <span>💣</span>
-          <small>2</small>
-        </button>
-        <button type="button" className="fire-btn" onClick={() => tryFire()}>
-          FIRE
-        </button>
-      </div>
-
-      <div className="bottom-ui">
-        <div style={{ minWidth: 88 }}>
-          {nearby && (
-            <button className="interact-btn" onClick={() => interact()}>
-              <span className="emoji">{nearby.emoji}</span>
-              <span className="label">{nearby.action}</span>
-            </button>
-          )}
+      {/* Nearby-only tip (generic controls auto-hide) */}
+      {(nearby || showControlsHint) && (
+        <div className={`hint ${nearby ? 'nearby' : 'controls'}`}>
+          {nearby
+            ? `${nearby.emoji} ${nearby.name} — ${nearby.action}`
+            : 'LOOK · move stick · FIRE · Space interact'}
         </div>
-        <Joystick />
+      )}
+
+      <div className="bottom-zone">
+        <div className="weapon-bar">
+          <button
+            type="button"
+            className={`weapon-slot ${equippedWeapon === 'gun' ? 'active' : ''}`}
+            onClick={() => setEquippedWeapon('gun')}
+            title="Blaster"
+          >
+            <span>🔫</span>
+            <small>{player.ammo ?? 0}</small>
+          </button>
+          <button
+            type="button"
+            className={`weapon-slot ${equippedWeapon === 'grenade' ? 'active' : ''}`}
+            onClick={() => setEquippedWeapon('grenade')}
+            title="Grenade"
+          >
+            <span>💣</span>
+            <small>{player.grenades ?? 0}</small>
+          </button>
+          <button type="button" className="fire-btn" onClick={() => tryFire()}>
+            FIRE
+          </button>
+        </div>
+
+        <div className="bottom-ui">
+          <div className="bottom-left">
+            <LookStick />
+            {nearby && (
+              <button className="interact-btn" onClick={() => interact()}>
+                <span className="emoji">{nearby.emoji}</span>
+                <span className="label">{nearby.action}</span>
+              </button>
+            )}
+          </div>
+          <Joystick />
+        </div>
       </div>
 
       {toast && <div className="toast">{toast}</div>}

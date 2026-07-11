@@ -4,7 +4,7 @@ import { getActiveQuest, resolveQuestTargetNearPlayer } from '../game/questTarge
 import { lookState } from '../game/lookState';
 
 /**
- * Arrow + distance to the current incomplete quest objective.
+ * Slim quest strip with direction arrow. Hidden when all quests complete.
  */
 export default function QuestCompass() {
   const player = useGameStore((s) => s.player);
@@ -13,32 +13,26 @@ export default function QuestCompass() {
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 100);
+    const id = setInterval(() => setTick((t) => t + 1), 120);
     return () => clearInterval(id);
   }, []);
 
   const quest = getActiveQuest(completedQuests);
-  if (!quest) {
-    return (
-      <div className="quest-compass done">
-        <div className="qc-emoji">⭐</div>
-        <div className="qc-meta">
-          <div className="qc-title">All quests done!</div>
-          <div className="qc-sub">Explore · hang out · make chaos</div>
-        </div>
-      </div>
-    );
-  }
+  // Free up screen when done
+  if (!quest) return null;
 
   const target = resolveQuestTargetNearPlayer(quest, player, fixedLeaks);
+  void tick;
+
   if (!target) {
     return (
-      <div className="quest-compass">
-        <div className="qc-emoji">📜</div>
-        <div className="qc-meta">
-          <div className="qc-title">{quest.title}</div>
-          <div className="qc-sub">{quest.description}</div>
-        </div>
+      <div className="quest-compass slim">
+        <span className="qc-emoji">📜</span>
+        <span className="qc-line">
+          <strong>{quest.title}</strong>
+          <span className="qc-sep">·</span>
+          {quest.description}
+        </span>
       </div>
     );
   }
@@ -46,34 +40,24 @@ export default function QuestCompass() {
   const dx = target.x - player.x;
   const dz = target.z - player.z;
   const dist = Math.hypot(dx, dz);
-  // world angle: 0 = +Z south? our forward when yaw=0 is (0,-1) in xz = -Z
-  // angle from player to target in world: atan2(dx, dz) but we use -Z as north-ish
   const worldAngle = Math.atan2(dx, dz);
-  // camera yaw: offset is (sin(yaw), cos(yaw)) behind player looking toward -offset
-  // forward angle = yaw + PI
   const camForward = lookState.yaw + Math.PI;
-  // relative: rotate world bearing into camera space
   let rel = worldAngle - camForward;
-  // normalize
   while (rel > Math.PI) rel -= Math.PI * 2;
   while (rel < -Math.PI) rel += Math.PI * 2;
   const deg = (rel * 180) / Math.PI;
 
-  void tick; // force re-render for live arrow
-
   return (
-    <div className="quest-compass">
+    <div className="quest-compass slim">
       <div className="qc-arrow-wrap" style={{ transform: `rotate(${deg}deg)` }}>
         <div className="qc-arrow">▲</div>
       </div>
-      <div className="qc-meta">
-        <div className="qc-title">
-          <span className="qc-obj">{target.emoji || '📜'}</span> {quest.title}
-        </div>
-        <div className="qc-sub">
-          {quest.description} · {dist < 3 ? 'Here!' : `${Math.round(dist)}m`}
-        </div>
-      </div>
+      <span className="qc-line">
+        <span className="qc-obj">{target.emoji || '📜'}</span>
+        <strong>{quest.title}</strong>
+        <span className="qc-sep">·</span>
+        {dist < 3 ? 'Here!' : `${Math.round(dist)}m`}
+      </span>
     </div>
   );
 }

@@ -17,8 +17,8 @@ export default function MiniMap() {
     if (!c) return undefined;
     const ctx = c.getContext('2d');
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const cssW = 148;
-    const cssH = 118;
+    const cssW = 120;
+    const cssH = 96;
     c.width = cssW * dpr;
     c.height = cssH * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
