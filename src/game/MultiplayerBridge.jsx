@@ -84,6 +84,13 @@ export default function MultiplayerBridge() {
           pushMessage(name, text, false);
         }
       },
+      onFire: (_peerId, data) => {
+        window.dispatchEvent(
+          new CustomEvent('cozy-remote-fire', {
+            detail: data,
+          })
+        );
+      },
     });
 
     if (!session) {
@@ -95,6 +102,7 @@ export default function MultiplayerBridge() {
     setNetHandlers({
       sendState: (state) => session.sendState(state),
       sendChat: (payload) => session.sendChat(payload),
+      sendFire: (payload) => session.sendFire(payload),
     });
 
     // presence heartbeat (in case peers miss a packet)

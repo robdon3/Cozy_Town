@@ -65,6 +65,7 @@ export function connectMultiplayer(roomCode, handlers = {}) {
   const stateAction = room.makeAction('pstate');
   const chatAction = room.makeAction('pchat');
   const emoteAction = room.makeAction('pemote');
+  const fireAction = room.makeAction('pfire');
 
   room.onPeerJoin = (peerId) => {
     handlers.onPeerJoin?.(peerId);
@@ -93,6 +94,11 @@ export function connectMultiplayer(roomCode, handlers = {}) {
     handlers.onEmote?.(peerId, data);
   };
 
+  fireAction.onMessage = (data, { peerId }) => {
+    if (!data || typeof data !== 'object') return;
+    handlers.onFire?.(peerId, data);
+  };
+
   session = {
     room,
     code,
@@ -106,6 +112,9 @@ export function connectMultiplayer(roomCode, handlers = {}) {
     },
     sendEmote(payload) {
       return emoteAction.send(payload).catch(() => {});
+    },
+    sendFire(payload) {
+      return fireAction.send(payload).catch(() => {});
     },
     leave() {
       return room.leave().catch(() => {});

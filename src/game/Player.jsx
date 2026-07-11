@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { createCharacterTexture, createLabelTexture } from './sprites';
 import { useGameStore } from './store';
+// useGameStore.getState() used for throttled autosave
 import { WORLD } from './data';
 import { getLookBasis } from './lookState';
 import { sfx } from '../audio/sounds';
@@ -24,6 +25,7 @@ export default function Player({ cameraTarget }) {
   const broadcastState = useGameStore((s) => s.broadcastState);
   const roomCode = useGameStore((s) => s.roomCode);
   const netTick = useRef(0);
+  const saveTick = useRef(0);
 
   const tex = useMemo(
     () => createCharacterTexture(player.avatar, '#6EC6FF'),
@@ -123,6 +125,13 @@ export default function Player({ cameraTarget }) {
       posSync.current = 0;
       setPlayerPos(group.current.position.x, group.current.position.z);
       updateNearby(group.current.position.x, group.current.position.z);
+    }
+
+    // autosave progress every ~8s while playing
+    saveTick.current = (saveTick.current || 0) + dt;
+    if (saveTick.current > 8) {
+      saveTick.current = 0;
+      useGameStore.getState().save();
     }
 
     // multiplayer presence ~8 Hz while moving, slower when idle

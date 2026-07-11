@@ -24,6 +24,24 @@ export default function App() {
     } catch {
       /* ignore */
     }
+
+    // Persist profile when tab closes / phone locks / app switches
+    const persist = () => {
+      try {
+        useGameStore.getState().save();
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener('beforeunload', persist);
+    window.addEventListener('pagehide', persist);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') persist();
+    });
+    return () => {
+      window.removeEventListener('beforeunload', persist);
+      window.removeEventListener('pagehide', persist);
+    };
   }, []);
 
   useEffect(() => {

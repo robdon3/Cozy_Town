@@ -15,6 +15,7 @@ import { getLookBasis } from './lookState';
 import { getNpcPos } from './npcRuntime';
 
 const SAVE_KEY = 'cozy-town-v3';
+const PROFILE_KEY = 'cozy-town-profile-v1';
 
 function loadSave() {
   try {
@@ -23,6 +24,14 @@ function loadSave() {
     return JSON.parse(raw);
   } catch {
     return null;
+  }
+}
+
+export function hasSavedProfile() {
+  try {
+    return Boolean(localStorage.getItem(SAVE_KEY));
+  } catch {
+    return false;
   }
 }
 
@@ -103,6 +112,7 @@ export const useGameStore = create((set, get) => ({
   selfPeerId: null,
   netSendState: null, // fn set by MultiplayerBridge
   netSendChat: null,
+  netSendFire: null,
 
   setMoveInput(x, z) {
     set({ moveInput: { x, z } });
@@ -144,8 +154,12 @@ export const useGameStore = create((set, get) => ({
     get().save();
   },
 
-  setNetHandlers({ sendState, sendChat }) {
-    set({ netSendState: sendState || null, netSendChat: sendChat || null });
+  setNetHandlers({ sendState, sendChat, sendFire }) {
+    set({
+      netSendState: sendState || null,
+      netSendChat: sendChat || null,
+      netSendFire: sendFire || null,
+    });
   },
 
   setMpMeta({ status, peerCount, selfPeerId }) {
@@ -609,30 +623,41 @@ export const useGameStore = create((set, get) => ({
 
   save() {
     const { player, completedQuests, muted, fixedLeaks } = get();
+    const payload = {
+      version: 3,
+      savedAt: Date.now(),
+      player: {
+        name: player.name,
+        avatar: player.avatar,
+        coins: player.coins,
+        level: player.level,
+        xp: player.xp,
+        energy: player.energy,
+        inventory: player.inventory,
+        x: player.x,
+        z: player.z,
+        ammo: player.ammo,
+        grenades: player.grenades,
+      },
+      completedQuests,
+      fixedLeaks,
+      muted,
+    };
     try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+      // lightweight profile card for title screen
       localStorage.setItem(
-        SAVE_KEY,
+        PROFILE_KEY,
         JSON.stringify({
-          player: {
-            name: player.name,
-            avatar: player.avatar,
-            coins: player.coins,
-            level: player.level,
-            xp: player.xp,
-            energy: player.energy,
-            inventory: player.inventory,
-            x: player.x,
-            z: player.z,
-            ammo: player.ammo,
-            grenades: player.grenades,
-          },
-          completedQuests,
-          fixedLeaks,
-          muted,
+          name: player.name,
+          avatar: player.avatar,
+          level: player.level,
+          coins: player.coins,
+          savedAt: payload.savedAt,
         })
       );
     } catch {
-      /* ignore quota */
+      /* ignore quota / private mode */
     }
   },
 

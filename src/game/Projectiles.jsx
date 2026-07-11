@@ -11,8 +11,12 @@ function emitBoom(x, y, z) {
   window.dispatchEvent(new CustomEvent('cozy-boom', { detail: { x, y, z } }));
 }
 
+function pushProjectile(list, p) {
+  list.current.push(p);
+}
+
 /**
- * Bullets + grenades simulation (local refs for performance).
+ * Bullets + grenades (local + remote multiplayer).
  */
 export default function Projectiles() {
   const group = useRef();
@@ -23,52 +27,132 @@ export default function Projectiles() {
   const showToast = useGameStore((s) => s.showToast);
   const hitCooldown = useRef(new Map());
 
+  // Local fire
   useEffect(() => {
     if (!fireRequest) return;
     const player = useGameStore.getState().player;
     const { forwardX, forwardZ } = getLookBasis();
     const id = fireRequest.id;
     const origin = {
-      x: player.x + forwardX * 0.8,
-      y: 1.2,
-      z: player.z + forwardZ * 0.8,
+      x: player.x + forwardX * 0.9,
+      y: 1.35,
+      z: player.z + forwardZ * 0.9,
     };
 
     if (fireRequest.kind === 'gun') {
       const speed = WEAPONS.gun.speed;
-      list.current.push({
+      pushProjectile(list, {
         id,
         kind: 'gun',
         x: origin.x,
         y: origin.y,
         z: origin.z,
         vx: forwardX * speed,
-        vy: 0.4,
+        vy: 0.15,
         vz: forwardZ * speed,
         life: WEAPONS.gun.lifetime,
+        trail: [],
+        color: '#ffe566',
+        remote: false,
       });
+      // broadcast to multiplayer peers
+      const send = useGameStore.getState().netSendFire;
+      if (send) {
+        send({
+          kind: 'gun',
+          x: origin.x,
+          y: origin.y,
+          z: origin.z,
+          vx: forwardX * speed,
+          vy: 0.15,
+          vz: forwardZ * speed,
+        });
+      }
     } else if (fireRequest.kind === 'grenade') {
       const speed = WEAPONS.grenade.throwSpeed;
-      list.current.push({
+      pushProjectile(list, {
         id,
         kind: 'grenade',
         x: origin.x,
-        y: origin.y + 0.3,
+        y: origin.y + 0.2,
         z: origin.z,
         vx: forwardX * speed,
-        vy: 8.5,
+        vy: 9,
         vz: forwardZ * speed,
         life: WEAPONS.grenade.fuse + 0.6,
         fuse: WEAPONS.grenade.fuse,
+        trail: [],
+        remote: false,
       });
+      const send = useGameStore.getState().netSendFire;
+      if (send) {
+        send({
+          kind: 'grenade',
+          x: origin.x,
+          y: origin.y + 0.2,
+          z: origin.z,
+          vx: forwardX * speed,
+          vy: 9,
+          vz: forwardZ * speed,
+        });
+      }
     }
     clearFireRequest();
   }, [fireRequest, clearFireRequest]);
 
+  // Remote fire events
+  useEffect(() => {
+    const onRemote = (e) => {
+      const d = e.detail || {};
+      if (!d.kind) return;
+      if (d.kind === 'gun') {
+        pushProjectile(list, {
+          id: `r-${Date.now()}-${Math.random()}`,
+          kind: 'gun',
+          x: Number(d.x) || 0,
+          y: Number(d.y) || 1.2,
+          z: Number(d.z) || 0,
+          vx: Number(d.vx) || 0,
+          vy: Number(d.vy) || 0,
+          vz: Number(d.vz) || 0,
+          life: WEAPONS.gun.lifetime,
+          trail: [],
+          color: '#ff7ad9',
+          remote: true,
+        });
+        sfx.gunshot();
+      } else if (d.kind === 'grenade') {
+        pushProjectile(list, {
+          id: `r-${Date.now()}-${Math.random()}`,
+          kind: 'grenade',
+          x: Number(d.x) || 0,
+          y: Number(d.y) || 1.2,
+          z: Number(d.z) || 0,
+          vx: Number(d.vx) || 0,
+          vy: Number(d.vy) || 8,
+          vz: Number(d.vz) || 0,
+          life: WEAPONS.grenade.fuse + 0.6,
+          fuse: WEAPONS.grenade.fuse,
+          trail: [],
+          remote: true,
+        });
+        sfx.grenadeThrow();
+      }
+    };
+    window.addEventListener('cozy-remote-fire', onRemote);
+    return () => window.removeEventListener('cozy-remote-fire', onRemote);
+  }, []);
+
   useFrame((_, dt) => {
     if (!group.current) return;
     while (group.current.children.length) {
-      group.current.remove(group.current.children[0]);
+      const ch = group.current.children[0];
+      group.current.remove(ch);
+      ch.geometry?.dispose?.();
+      if (ch.material) {
+        if (Array.isArray(ch.material)) ch.material.forEach((m) => m.dispose?.());
+        else ch.material.dispose?.();
+      }
     }
 
     const next = [];
@@ -76,37 +160,65 @@ export default function Projectiles() {
 
     for (const p of list.current) {
       if (p.kind === 'gun') {
+        p.trail = p.trail || [];
+        p.trail.push({ x: p.x, y: p.y, z: p.z });
+        if (p.trail.length > 8) p.trail.shift();
+
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         p.z += p.vz * dt;
         p.life -= dt;
 
-        for (const npc of NPCS) {
-          const pos = getNpcPos(npc.id);
-          const d = Math.hypot(p.x - pos.x, p.z - pos.z);
-          if (d < 1.35 && p.y < 2.6) {
-            const last = hitCooldown.current.get(npc.id) || 0;
-            if (Date.now() - last > 750) {
-              hitCooldown.current.set(npc.id, Date.now());
-              onNpcHit(npc.id);
-              sfx.hit();
+        if (!p.remote) {
+          for (const npc of NPCS) {
+            const pos = getNpcPos(npc.id);
+            const d = Math.hypot(p.x - pos.x, p.z - pos.z);
+            if (d < 1.4 && p.y < 2.8) {
+              const last = hitCooldown.current.get(npc.id) || 0;
+              if (Date.now() - last > 750) {
+                hitCooldown.current.set(npc.id, Date.now());
+                onNpcHit(npc.id);
+                sfx.hit();
+              }
+              p.life = 0;
+              break;
             }
-            p.life = 0;
-            break;
           }
         }
 
         if (p.life > 0 && Math.abs(p.x) < bound && Math.abs(p.z) < bound && p.y > 0) {
+          // tracer streak
+          if (p.trail.length > 1) {
+            const pts = p.trail.map((t) => new THREE.Vector3(t.x, t.y, t.z));
+            const geo = new THREE.BufferGeometry().setFromPoints(pts);
+            const line = new THREE.Line(
+              geo,
+              new THREE.LineBasicMaterial({
+                color: p.color || '#ffe566',
+                transparent: true,
+                opacity: 0.85,
+              })
+            );
+            group.current.add(line);
+          }
+          // bright bolt
           const mesh = new THREE.Mesh(
-            new THREE.SphereGeometry(0.12, 8, 8),
-            new THREE.MeshStandardMaterial({
-              color: '#ffe566',
-              emissive: '#ffaa00',
-              emissiveIntensity: 0.9,
-            })
+            new THREE.SphereGeometry(0.22, 10, 10),
+            new THREE.MeshBasicMaterial({ color: p.color || '#ffe566' })
           );
           mesh.position.set(p.x, p.y, p.z);
           group.current.add(mesh);
+          // glow shell
+          const glow = new THREE.Mesh(
+            new THREE.SphereGeometry(0.4, 10, 10),
+            new THREE.MeshBasicMaterial({
+              color: p.remote ? '#ff66cc' : '#ffaa33',
+              transparent: true,
+              opacity: 0.35,
+            })
+          );
+          glow.position.set(p.x, p.y, p.z);
+          group.current.add(glow);
           next.push(p);
         }
       } else if (p.kind === 'grenade') {
@@ -116,39 +228,56 @@ export default function Projectiles() {
         p.z += p.vz * dt;
         p.fuse -= dt;
         p.life -= dt;
+        p.spin = (p.spin || 0) + dt * 10;
 
-        if (p.y < 0.25) {
-          p.y = 0.25;
-          p.vy *= -0.35;
-          p.vx *= 0.85;
-          p.vz *= 0.85;
+        if (p.y < 0.28) {
+          p.y = 0.28;
+          p.vy *= -0.38;
+          p.vx *= 0.82;
+          p.vz *= 0.82;
         }
         p.x = THREE.MathUtils.clamp(p.x, -bound, bound);
         p.z = THREE.MathUtils.clamp(p.z, -bound, bound);
 
         if (p.fuse <= 0) {
           sfx.explosion();
-          showToast('💥 Boom!');
+          if (!p.remote) showToast('💥 Boom!');
           emitBoom(p.x, p.y, p.z);
-          for (const npc of NPCS) {
-            const pos = getNpcPos(npc.id);
-            if (Math.hypot(p.x - pos.x, p.z - pos.z) < WEAPONS.grenade.radius) {
-              onNpcHit(npc.id);
+          if (!p.remote) {
+            for (const npc of NPCS) {
+              const pos = getNpcPos(npc.id);
+              if (Math.hypot(p.x - pos.x, p.z - pos.z) < WEAPONS.grenade.radius) {
+                onNpcHit(npc.id);
+              }
             }
           }
         } else if (p.life > 0) {
-          const mesh = new THREE.Mesh(
-            new THREE.SphereGeometry(0.28, 10, 10),
-            new THREE.MeshStandardMaterial({ color: '#2d5a27', roughness: 0.55 })
+          const blink = Math.sin(p.fuse * 20) > 0;
+          const body = new THREE.Mesh(
+            new THREE.SphereGeometry(0.42, 12, 12),
+            new THREE.MeshStandardMaterial({
+              color: blink ? '#4cff4c' : '#1f4a1c',
+              emissive: blink ? '#33ff33' : '#0a200a',
+              emissiveIntensity: blink ? 1.2 : 0.3,
+              roughness: 0.4,
+            })
           );
-          mesh.position.set(p.x, p.y, p.z);
-          const pin = new THREE.Mesh(
-            new THREE.BoxGeometry(0.08, 0.2, 0.08),
-            new THREE.MeshStandardMaterial({ color: '#c0c0c0' })
+          body.position.set(p.x, p.y, p.z);
+          body.rotation.y = p.spin;
+          group.current.add(body);
+          // danger ring on ground
+          const ring = new THREE.Mesh(
+            new THREE.RingGeometry(0.5, 0.7, 24),
+            new THREE.MeshBasicMaterial({
+              color: '#ff4444',
+              transparent: true,
+              opacity: 0.45,
+              side: THREE.DoubleSide,
+            })
           );
-          pin.position.set(0, 0.2, 0);
-          mesh.add(pin);
-          group.current.add(mesh);
+          ring.rotation.x = -Math.PI / 2;
+          ring.position.set(p.x, 0.05, p.z);
+          group.current.add(ring);
           next.push(p);
         }
       }
@@ -166,19 +295,19 @@ export function ExplosionFX() {
   useEffect(() => {
     const handler = (e) => {
       const { x, y, z } = e.detail || {};
-      items.current.push({ x, y: y ?? 0.3, z, life: 0.5, scale: 0.35 });
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2;
+      items.current.push({ x, y: y ?? 0.3, z, life: 0.55, scale: 0.5 });
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
         items.current.push({
-          x: x + Math.cos(a) * 0.2,
-          y: (y ?? 0.3) + 0.2,
-          z: z + Math.sin(a) * 0.2,
-          life: 0.35 + Math.random() * 0.2,
-          scale: 0.15,
+          x: x + Math.cos(a) * 0.25,
+          y: (y ?? 0.3) + 0.25,
+          z: z + Math.sin(a) * 0.25,
+          life: 0.4 + Math.random() * 0.25,
+          scale: 0.2,
           spark: true,
-          vx: Math.cos(a) * 4,
-          vz: Math.sin(a) * 4,
-          vy: 3 + Math.random() * 2,
+          vx: Math.cos(a) * 6,
+          vz: Math.sin(a) * 6,
+          vy: 4 + Math.random() * 3,
         });
       }
     };
@@ -198,18 +327,18 @@ export function ExplosionFX() {
         e.x += (e.vx || 0) * dt;
         e.y += (e.vy || 0) * dt;
         e.z += (e.vz || 0) * dt;
-        e.vy -= 12 * dt;
-        e.scale = Math.max(0.05, e.scale - dt * 0.2);
+        e.vy -= 14 * dt;
+        e.scale = Math.max(0.06, e.scale - dt * 0.25);
       } else {
-        e.scale += dt * 7;
+        e.scale += dt * 9;
       }
       if (e.life <= 0) continue;
       const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(e.scale, 10, 10),
+        new THREE.SphereGeometry(e.scale, 12, 12),
         new THREE.MeshBasicMaterial({
-          color: e.spark ? '#ffcc44' : e.life > 0.25 ? '#ff8833' : '#555555',
+          color: e.spark ? '#ffee55' : e.life > 0.28 ? '#ff7722' : '#666666',
           transparent: true,
-          opacity: Math.max(0, e.life * 2.2),
+          opacity: Math.max(0, e.life * 2.4),
         })
       );
       mesh.position.set(e.x, Math.max(0.1, e.y), e.z);

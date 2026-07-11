@@ -1,68 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../game/store';
-import { BUILDINGS, NPCS, PIPE_LEAKS, QUESTS, SHOP_ITEMS, WORLD } from '../game/data';
+import { PIPE_LEAKS, QUESTS, SHOP_ITEMS } from '../game/data';
 import Joystick from './Joystick';
 import LookStick from './LookStick';
+import MiniMap from './MiniMap';
+import QuestCompass from './QuestCompass';
 import { sfx, setMuted as setAudioMuted, startMusic, stopMusic } from '../audio/sounds';
 import { roomInviteUrl } from '../game/multiplayer';
-import { getNpcPos } from '../game/npcRuntime';
-
-function MiniMap() {
-  const canvasRef = useRef(null);
-  const player = useGameStore((s) => s.player);
-  const remotePlayers = useGameStore((s) => s.remotePlayers);
-  const fixedLeaks = useGameStore((s) => s.fixedLeaks);
-
-  useEffect(() => {
-    const c = canvasRef.current;
-    if (!c) return;
-    const ctx = c.getContext('2d');
-    const w = c.width;
-    const h = c.height;
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = '#163f28';
-    ctx.fillRect(0, 0, w, h);
-
-    const sx = (x) => ((x + WORLD.half) / WORLD.size) * w;
-    const sy = (z) => ((z + WORLD.half) / WORLD.size) * h;
-
-    BUILDINGS.forEach((b) => {
-      ctx.fillStyle = '#f6c453';
-      ctx.fillRect(sx(b.x) - 2, sy(b.z) - 2, 4, 4);
-    });
-
-    NPCS.filter((n) => n.role === 'plumber').forEach((n) => {
-      const pos = getNpcPos(n.id);
-      ctx.fillStyle = '#5B8DEF';
-      ctx.fillRect(sx(pos.x) - 2, sy(pos.z) - 2, 4, 4);
-    });
-
-    PIPE_LEAKS.forEach((leak) => {
-      ctx.fillStyle = fixedLeaks.includes(leak.id) ? '#4ade80' : '#38bdf8';
-      ctx.beginPath();
-      ctx.arc(sx(leak.x), sy(leak.z), 2, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    Object.values(remotePlayers).forEach((p) => {
-      ctx.fillStyle = '#c084fc';
-      ctx.beginPath();
-      ctx.arc(sx(p.x), sy(p.z), 2.5, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    ctx.fillStyle = '#ff5c5c';
-    ctx.beginPath();
-    ctx.arc(sx(player.x), sy(player.z), 3, 0, Math.PI * 2);
-    ctx.fill();
-  }, [player.x, player.z, remotePlayers, fixedLeaks]);
-
-  return (
-    <div className="minimap">
-      <canvas ref={canvasRef} width={120} height={90} />
-    </div>
-  );
-}
 
 function Modal({ title, children, onClose }) {
   return (
@@ -298,6 +242,10 @@ export default function HUD() {
 
       </div>
 
+      {/* Always visible — top-right, above menu */}
+      <MiniMap />
+      <QuestCompass />
+
       <div className="chat-dock">
         {chatExpanded || panels.chat ? (
           <div className="chat-panel">
@@ -358,8 +306,6 @@ export default function HUD() {
           )
         )}
       </div>
-
-      {panels.menu && <MiniMap />}
 
       {panels.menu && (
         <div className="menu-panel">

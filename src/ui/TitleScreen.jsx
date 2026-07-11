@@ -15,8 +15,11 @@ export default function TitleScreen() {
   const inviteRoom = useMemo(() => parseRoomFromUrl(), []);
   const [joinCode, setJoinCode] = useState(inviteRoom || '');
   const [busy, setBusy] = useState(false);
-  const [freshWorld, setFreshWorld] = useState(true);
+  // OFF by default so progress persists in the browser when you leave
+  const [freshWorld, setFreshWorld] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const hasSave = player.level > 1 || player.coins !== 150 || (player.inventory?.length || 0) > 0
+    || player.xp > 0;
 
   const enter = async (roomCode) => {
     if (busy) return;
@@ -90,6 +93,14 @@ export default function TitleScreen() {
             </div>
           </div>
           <div className="version-badge">{GAME_BUILD_LABEL}</div>
+
+          {hasSave && !isInvite && (
+            <div className="save-banner">
+              Saved profile: <strong>{player.avatar} {player.name}</strong>
+              {' · '}Lv.{player.level} · {player.coins}💰
+              <span className="save-sub">Progress is kept on this device’s browser</span>
+            </div>
+          )}
 
           {isInvite && (
             <div className="invite-banner invite-banner-strong">
@@ -222,7 +233,7 @@ export default function TitleScreen() {
               }}
             />
             <span>
-              <strong>Fresh world</strong> — reset progress when you enter
+              <strong>Fresh world</strong> — only check to wipe saves (off = keep your profile)
             </span>
           </label>
 
