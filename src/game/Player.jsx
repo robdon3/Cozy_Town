@@ -100,8 +100,11 @@ export default function Player({ cameraTarget }) {
     if (k.d || k.arrowright) ix += 1;
 
     const room = interiorId ? INTERIORS[interiorId] : null;
-    const halfW = room ? room.w / 2 - 0.9 : BOUND;
-    const halfD = room ? room.d / 2 - 0.9 : BOUND;
+    // Match Interior.jsx spacious stage (min 22×18)
+    const roomW = room ? Math.max(room.w, 22) : 0;
+    const roomD = room ? Math.max(room.d, 18) : 0;
+    const halfW = room ? roomW / 2 - 1.2 : BOUND;
+    const halfD = room ? roomD / 2 - 1.2 : BOUND;
 
     const len = Math.hypot(ix, iz);
     let moving = false;

@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import * as THREE from 'three';
 import { Billboard } from '@react-three/drei';
 import { INTERIORS } from './data';
 import { createEmojiTexture, createLabelTexture } from './sprites';
@@ -154,8 +153,9 @@ function InteractMarker({ obj }) {
 }
 
 /**
- * Pokémon-style indoor room: fully sealed box so outdoor world never bleeds in.
- * Camera is pulled tight indoors so it stays inside the volume.
+ * Pokémon-style indoor room: open and readable.
+ * No tall sealed walls / ceiling / black shell — those blocked the camera.
+ * Low half-walls mark the border; camera looks over them easily.
  */
 export default function Interior({ buildingId }) {
   const room = INTERIORS[buildingId];
@@ -163,102 +163,91 @@ export default function Interior({ buildingId }) {
     () => (room ? createLabelTexture(`${room.emoji} ${room.name}`) : null),
     [room]
   );
-  const exitLabel = useMemo(() => createLabelTexture('🚪 Walk here to leave'), []);
+  const exitLabel = useMemo(() => createLabelTexture('🚪 Exit'), []);
 
   if (!room) return null;
 
-  const hw = room.w / 2;
-  const hd = room.d / 2;
-  const wallH = 4.2;
-  const wallT = 0.55;
-  // slightly larger than room so camera never peeks past edges
-  const shell = Math.max(room.w, room.d) + 14;
+  // Spacious playable floor (data sizes are minimums)
+  const w = Math.max(room.w, 22);
+  const d = Math.max(room.d, 18);
+  const hw = w / 2;
+  const hd = d / 2;
+  // Short borders so the camera always sees over them
+  const borderH = 1.15;
+  const borderT = 0.4;
+  const bg = room.sky || '#e8d5b8';
 
   return (
     <group>
-      <color attach="background" args={['#120e16']} />
-      <fog attach="fog" args={['#120e16', 8, 18]} />
-      <ambientLight intensity={0.62} />
-      <pointLight position={[0, 3.0, 0]} intensity={1.25} distance={18} color="#ffe8c8" />
-      <pointLight position={[-3.5, 2.2, -2]} intensity={0.45} distance={9} color={room.accent} />
-      <pointLight position={[3.5, 2.2, 2]} intensity={0.3} distance={8} color="#ffd4a8" />
+      {/* Bright open “stage” — not a sealed box */}
+      <color attach="background" args={[bg]} />
+      <fog attach="fog" args={[bg, 28, 55]} />
+      <ambientLight intensity={0.85} />
+      <hemisphereLight args={['#fff6e8', room.floor || '#c4a882', 0.55]} />
+      <directionalLight position={[8, 18, 6]} intensity={0.85} castShadow />
+      <pointLight position={[0, 6, 0]} intensity={0.55} distance={30} color="#ffe8c8" />
 
-      {/* Outer void shell — inverted cube so only black is outside */}
-      <mesh>
-        <boxGeometry args={[shell, shell * 0.7, shell]} />
-        <meshBasicMaterial color="#0a0810" side={THREE.BackSide} depthWrite />
-      </mesh>
-
-      {/* Thick floor */}
+      {/* Large floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[room.w + 0.2, room.d + 0.2]} />
+        <planeGeometry args={[w + 2, d + 2]} />
         <meshStandardMaterial color={room.floor} roughness={0.92} />
       </mesh>
-      {/* subfloor pad under door mat */}
-      <mesh position={[0, -0.15, 0]} receiveShadow>
-        <boxGeometry args={[room.w + wallT * 2, 0.3, room.d + wallT * 2]} />
-        <meshStandardMaterial color="#2a1e18" />
+      {/* Outer grass ring so edges feel open, not black */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
+        <planeGeometry args={[w + 24, d + 24]} />
+        <meshStandardMaterial color="#6aab7a" roughness={1} />
       </mesh>
 
-      {/* Ceiling (solid, faces down into room) */}
-      <mesh position={[0, wallH, 0]}>
-        <boxGeometry args={[room.w + wallT * 2, 0.4, room.d + wallT * 2]} />
-        <meshStandardMaterial color="#2a2430" roughness={1} />
+      {/* Low half-walls (borders only) */}
+      <mesh position={[0, borderH / 2, -hd]} castShadow receiveShadow>
+        <boxGeometry args={[w + borderT * 2, borderH, borderT]} />
+        <meshStandardMaterial color={room.wall} roughness={0.85} />
+      </mesh>
+      <mesh position={[0, borderH / 2, hd]} castShadow receiveShadow>
+        <boxGeometry args={[w + borderT * 2, borderH, borderT]} />
+        <meshStandardMaterial color={room.wall} roughness={0.85} />
+      </mesh>
+      <mesh position={[-hw, borderH / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[borderT, borderH, d]} />
+        <meshStandardMaterial color={room.wall} roughness={0.85} />
+      </mesh>
+      <mesh position={[hw, borderH / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[borderT, borderH, d]} />
+        <meshStandardMaterial color={room.wall} roughness={0.85} />
       </mesh>
 
-      {/* Four solid walls — fully closed (exit is floor mat, not a hole) */}
-      {/* North */}
-      <mesh position={[0, wallH / 2, -hd - wallT / 2]} castShadow receiveShadow>
-        <boxGeometry args={[room.w + wallT * 2, wallH, wallT]} />
-        <meshStandardMaterial color={room.wall} roughness={0.85} side={THREE.DoubleSide} />
+      {/* Soft tall backdrop on north only (far, decorative — not a full enclosure) */}
+      <mesh position={[0, 2.4, -hd - 0.8]}>
+        <boxGeometry args={[w * 0.85, 4.2, 0.25]} />
+        <meshStandardMaterial color={room.wall} roughness={0.9} />
       </mesh>
-      {/* South — solid; door frame painted on, not open */}
-      <mesh position={[0, wallH / 2, hd + wallT / 2]} castShadow receiveShadow>
-        <boxGeometry args={[room.w + wallT * 2, wallH, wallT]} />
-        <meshStandardMaterial color={room.wall} roughness={0.85} side={THREE.DoubleSide} />
+      {/* Windows on backdrop */}
+      <mesh position={[-w * 0.18, 2.6, -hd - 0.7]}>
+        <boxGeometry args={[2.2, 1.4, 0.12]} />
+        <meshStandardMaterial color="#ffe9a8" emissive="#ffd56a" emissiveIntensity={0.6} />
       </mesh>
-      {/* West */}
-      <mesh position={[-hw - wallT / 2, wallH / 2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[wallT, wallH, room.d]} />
-        <meshStandardMaterial color={room.wall} roughness={0.85} side={THREE.DoubleSide} />
-      </mesh>
-      {/* East */}
-      <mesh position={[hw + wallT / 2, wallH / 2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[wallT, wallH, room.d]} />
-        <meshStandardMaterial color={room.wall} roughness={0.85} side={THREE.DoubleSide} />
+      <mesh position={[w * 0.18, 2.6, -hd - 0.7]}>
+        <boxGeometry args={[2.2, 1.4, 0.12]} />
+        <meshStandardMaterial color="#ffe9a8" emissive="#ffd56a" emissiveIntensity={0.6} />
       </mesh>
 
-      {/* Decorative door frame on south wall (still solid) */}
-      <mesh position={[0, 1.1, hd + wallT / 2 + 0.02]}>
-        <boxGeometry args={[1.6, 2.2, 0.08]} />
+      {/* Door gap mark on south border */}
+      <mesh position={[0, borderH / 2 + 0.05, hd + 0.05]}>
+        <boxGeometry args={[2.4, borderH + 0.1, 0.2]} />
         <meshStandardMaterial color="#3a2a1a" />
       </mesh>
-      <mesh position={[0, 1.1, hd + wallT / 2 + 0.05]}>
-        <boxGeometry args={[1.25, 1.9, 0.06]} />
-        <meshStandardMaterial color="#5c4030" emissive="#2a1810" emissiveIntensity={0.15} />
-      </mesh>
 
-      {/* Windows glow (fake, on north wall) */}
-      <mesh position={[-hw * 0.35, wallH * 0.55, -hd - wallT / 2 - 0.02]}>
-        <boxGeometry args={[1.2, 1.0, 0.08]} />
-        <meshStandardMaterial color="#ffe9a8" emissive="#ffd56a" emissiveIntensity={0.55} />
-      </mesh>
-      <mesh position={[hw * 0.35, wallH * 0.55, -hd - wallT / 2 - 0.02]}>
-        <boxGeometry args={[1.2, 1.0, 0.08]} />
-        <meshStandardMaterial color="#ffe9a8" emissive="#ffd56a" emissiveIntensity={0.55} />
-      </mesh>
-
-      {/* Door mat near south wall — walk here to leave */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, room.exitZ - 0.35]} receiveShadow>
-        <planeGeometry args={[2.6, 1.4]} />
+      {/* Exit mat */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, room.exitZ]} receiveShadow>
+        <planeGeometry args={[2.8, 1.6]} />
         <meshStandardMaterial color="#4a3020" roughness={1} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, room.exitZ - 0.35]}>
-        <planeGeometry args={[2.2, 1.0]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, room.exitZ]}>
+        <planeGeometry args={[2.3, 1.15]} />
         <meshStandardMaterial color="#6b4423" roughness={1} />
       </mesh>
-      <Billboard position={[0, 0.9, room.exitZ - 0.35]}>
-        <sprite scale={[3.0, 0.55, 1]}>
+      <Billboard position={[0, 1.0, room.exitZ]}>
+        <sprite scale={[2.4, 0.55, 1]}>
           <spriteMaterial map={exitLabel} transparent depthWrite={false} />
         </sprite>
       </Billboard>
@@ -271,8 +260,8 @@ export default function Interior({ buildingId }) {
       ))}
 
       {title && (
-        <Billboard position={[0, wallH - 0.55, -hd + 0.55]}>
-          <sprite scale={[4, 0.9, 1]}>
+        <Billboard position={[0, 4.2, -hd - 0.5]}>
+          <sprite scale={[5, 1.0, 1]}>
             <spriteMaterial map={title} transparent depthWrite={false} />
           </sprite>
         </Billboard>

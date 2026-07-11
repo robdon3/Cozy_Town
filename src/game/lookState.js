@@ -13,8 +13,8 @@ export const lookState = {
 };
 
 const OUTDOOR = { pitch: 0.62, distance: 16, pitchMin: 0.22, pitchMax: 1.25 };
-// Keep camera *inside* the room so you don't see exterior wall backs
-const INDOOR = { pitch: 0.95, distance: 5.5, pitchMin: 0.55, pitchMax: 1.15 };
+// Open indoor stage: high angle, roomy distance — look over low half-walls
+const INDOOR = { pitch: 0.78, distance: 12, pitchMin: 0.4, pitchMax: 1.2 };
 
 export function getLookBasis() {
   const yaw = lookState.yaw;
