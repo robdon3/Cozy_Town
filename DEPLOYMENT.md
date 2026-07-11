@@ -1,99 +1,26 @@
-# 🚀 Deploying Cozy Town to GitHub Pages
+# Deploying Cozy Town 3D to GitHub Pages
 
-Follow these steps to host your Cozy Town game on GitHub Pages so you can play it on your phone!
+Push to `main` and GitHub Actions builds the Vite app, then deploys the `dist/` folder.
 
-## Step 1: Create a GitHub Repository
+## Live URL
 
-1. Go to [GitHub.com](https://github.com) and sign in
-2. Click the "+" icon in the top right and select "New repository"
-3. Name your repository (e.g., `cozy-town-game`)
-4. Make it **Public** (required for free GitHub Pages)
-5. **Don't** initialize with README, .gitignore, or license (we already have these)
-6. Click "Create repository"
+**https://robdon3.github.io/Cozy_Town/**
 
-## Step 2: Connect Your Local Repository
+## First-time setup
 
-Run these commands in your terminal:
+1. Repo **Settings → Pages → Source**: GitHub Actions
+2. Ensure the repo is public (or you have Pages on a private plan)
+3. Push to `main`
+
+## Local commands
 
 ```bash
-# Add the remote repository (replace YOUR_USERNAME and REPO_NAME)
-git remote add origin https://github.com/YOUR_USERNAME/REPO_NAME.git
-
-# Push your code to GitHub
-git branch -M main
-git push -u origin main
+npm install
+npm start          # http://localhost:3000
+npm run build      # writes to dist/
+npm run preview    # preview production build
 ```
 
-## Step 3: Enable GitHub Pages
+## Sharing with friends
 
-1. Go to your repository on GitHub
-2. Click on **Settings** tab
-3. Scroll down to **Pages** section (in the left sidebar)
-4. Under **Source**, select **GitHub Actions**
-5. The deployment workflow will automatically run when you push code
-
-## Step 4: Access Your Game
-
-After the deployment completes (usually takes 1-2 minutes):
-
-1. Go to your repository's **Actions** tab
-2. Click on the latest workflow run
-3. Look for the deployment URL (usually something like `https://YOUR_USERNAME.github.io/REPO_NAME/`)
-4. **Bookmark this URL on your phone!**
-
-## Step 5: Mobile Optimization
-
-The game is already optimized for mobile with:
-
-- ✅ **Responsive viewport** settings
-- ✅ **Touch controls** with virtual joystick
-- ✅ **iPhone notch support** with safe area insets
-- ✅ **Pull-to-refresh prevention**
-- ✅ **Mobile-optimized UI** with proper touch targets
-- ✅ **Landscape/portrait mode** support
-
-## Troubleshooting
-
-### If the site doesn't load:
-1. Check the **Actions** tab for any deployment errors
-2. Make sure your repository is **Public**
-3. Wait a few minutes for the deployment to complete
-
-### If the game doesn't work on mobile:
-1. Clear your browser cache
-2. Try opening in an incognito/private window
-3. Make sure you're using a modern mobile browser (Safari, Chrome, Firefox)
-
-### If you need to update the game:
-1. Make your changes locally
-2. Commit and push to GitHub:
-   ```bash
-   git add .
-   git commit -m "Update game features"
-   git push
-   ```
-3. The site will automatically redeploy
-
-## Game URL Format
-
-Your game will be available at:
-```
-https://YOUR_USERNAME.github.io/REPO_NAME/
-```
-
-For example:
-```
-https://johndoe.github.io/cozy-town-game/
-```
-
-## Mobile Browser Compatibility
-
-✅ **iOS Safari** (recommended)
-✅ **Chrome Mobile**
-✅ **Firefox Mobile**
-✅ **Samsung Internet**
-✅ **Desktop browsers** (for testing)
-
----
-
-**Enjoy playing Cozy Town on your phone! 🏠📱** 
+In-game, tap **📤** or **Invite friends** — uses the Web Share API on mobile, or copies the play link on desktop.
