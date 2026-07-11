@@ -16,6 +16,7 @@ export default function TitleScreen() {
   const [joinCode, setJoinCode] = useState(inviteRoom || '');
   const [busy, setBusy] = useState(false);
   const [freshWorld, setFreshWorld] = useState(true);
+  const [showMore, setShowMore] = useState(false);
 
   const enter = async (roomCode) => {
     if (busy) return;
@@ -50,7 +51,7 @@ export default function TitleScreen() {
   };
 
   const joinRoom = () => {
-    const code = normalizeRoomCode(joinCode);
+    const code = normalizeRoomCode(joinCode || inviteRoom);
     if (code.length < 4) {
       sfx.error();
       return;
@@ -71,129 +72,225 @@ export default function TitleScreen() {
     hardResetWorldAndReload({ keepRoom: Boolean(inviteRoom) });
   };
 
+  const isInvite = Boolean(inviteRoom);
+
   return (
-    <div className="title-screen">
-      <div className="title-card">
-        <div style={{ fontSize: 56, marginBottom: 8 }}>🏡</div>
-        <h1>Cozy Town</h1>
-        <p className="tagline">3D town · plumbers · multiplayer · blasters</p>
-        <div className="version-badge">{GAME_BUILD_LABEL}</div>
-
-        {inviteRoom ? (
-          <div className="invite-banner">
-            Invite room detected: <strong>{inviteRoom}</strong>
+    <div className={`title-screen ${isInvite ? 'is-invite' : ''}`}>
+      <div className="title-scroll">
+        <div className="title-card">
+          <div className="title-hero">
+            <span className="title-emoji" aria-hidden>
+              🏡
+            </span>
+            <div>
+              <h1>Cozy Town</h1>
+              <p className="tagline">
+                {isInvite ? 'Your friend invited you!' : '3D town · plumbers · multiplayer'}
+              </p>
+            </div>
           </div>
-        ) : null}
+          <div className="version-badge">{GAME_BUILD_LABEL}</div>
 
-        <div className="field" style={{ textAlign: 'left' }}>
-          <label>Your name</label>
-          <input
-            value={name}
-            maxLength={16}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Explorer"
-          />
-        </div>
+          {isInvite && (
+            <div className="invite-banner invite-banner-strong">
+              Room <strong className="room-code-lg">{inviteRoom}</strong>
+              <span className="invite-sub">Pick a name & avatar, then tap Join below</span>
+            </div>
+          )}
 
-        <div className="field" style={{ textAlign: 'left' }}>
-          <label>Avatar</label>
-          <div className="avatar-grid">
-            {AVATARS.map((a) => (
-              <button
-                key={a}
-                type="button"
-                className={`avatar-opt ${avatar === a ? 'selected' : ''}`}
-                onClick={() => {
-                  sfx.click();
-                  setAvatar(a);
-                }}
-              >
-                {a}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <label className="fresh-toggle">
-          <input
-            type="checkbox"
-            checked={freshWorld}
-            onChange={(e) => {
-              sfx.click();
-              setFreshWorld(e.target.checked);
-            }}
-          />
-          <span>
-            <strong>Fresh world</strong> — reset leaks, quests, inventory &amp; spawn when you play
-          </span>
-        </label>
-
-        <div className="controls-help">
-          <div>
-            <strong>Move:</strong> WASD / arrows or right joystick
-          </div>
-          <div>
-            <strong>Look:</strong> drag screen / look stick / Q·E
-          </div>
-          <div>
-            <strong>Plumbers:</strong> Nico&apos;s crew at Pipeworks HQ · Fix 💧 leaks
-          </div>
-          <div>
-            <strong>Fun:</strong> 🔫 blaster · 💣 grenades · shop for ammo
-          </div>
-          <div>
-            <strong>Stuck on an old build?</strong> use “Reload latest” below
-          </div>
-        </div>
-
-        <div className="btn-row" style={{ marginBottom: 10 }}>
-          <button
-            className="btn btn-primary"
-            style={{ flex: 1.2 }}
-            disabled={busy}
-            onClick={createRoom}
-          >
-            Create room & play
-          </button>
-          <button className="btn btn-secondary" disabled={busy} onClick={playSolo}>
-            Solo
-          </button>
-        </div>
-
-        <div className="field" style={{ textAlign: 'left', marginBottom: 8 }}>
-          <label>Join friend&apos;s room</label>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="field">
+            <label htmlFor="player-name">Your name</label>
             <input
-              value={joinCode}
-              maxLength={8}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              placeholder="e.g. K7M2P"
-              style={{ flex: 1, letterSpacing: '0.12em', fontWeight: 700 }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') joinRoom();
+              id="player-name"
+              value={name}
+              maxLength={16}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Explorer"
+              autoComplete="nickname"
+              enterKeyHint="done"
+            />
+          </div>
+
+          <div className="field">
+            <label>Avatar</label>
+            <div className="avatar-grid" role="listbox" aria-label="Choose avatar">
+              {AVATARS.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  className={`avatar-opt ${avatar === a ? 'selected' : ''}`}
+                  onClick={() => {
+                    sfx.click();
+                    setAvatar(a);
+                  }}
+                  aria-label={`Avatar ${a}`}
+                  aria-selected={avatar === a}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Primary actions — always near the top on invite links */}
+          {isInvite ? (
+            <div className="title-primary-actions">
+              <button
+                className="btn btn-primary btn-xl"
+                disabled={busy}
+                onClick={joinRoom}
+              >
+                {busy ? 'Joining…' : `Join room ${inviteRoom}`}
+              </button>
+              <p className="action-hint">Uses the invite code from your link</p>
+            </div>
+          ) : (
+            <div className="title-primary-actions">
+              <div className="btn-row">
+                <button
+                  className="btn btn-primary"
+                  style={{ flex: 1.3 }}
+                  disabled={busy}
+                  onClick={createRoom}
+                >
+                  Create room & play
+                </button>
+                <button className="btn btn-secondary" disabled={busy} onClick={playSolo}>
+                  Solo
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!isInvite && (
+            <div className="field join-field">
+              <label htmlFor="room-code">Join friend&apos;s room</label>
+              <div className="join-row">
+                <input
+                  id="room-code"
+                  value={joinCode}
+                  maxLength={8}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  placeholder="CODE"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  enterKeyHint="go"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') joinRoom();
+                  }}
+                />
+                <button
+                  className="btn btn-primary"
+                  disabled={busy}
+                  onClick={joinRoom}
+                >
+                  Join
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isInvite && (
+            <div className="field join-field compact">
+              <label htmlFor="room-code-alt">Different room code?</label>
+              <div className="join-row">
+                <input
+                  id="room-code-alt"
+                  value={joinCode}
+                  maxLength={8}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  placeholder={inviteRoom}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
+                <button className="btn btn-secondary" disabled={busy} onClick={joinRoom}>
+                  Join
+                </button>
+              </div>
+            </div>
+          )}
+
+          <label className="fresh-toggle">
+            <input
+              type="checkbox"
+              checked={freshWorld}
+              onChange={(e) => {
+                sfx.click();
+                setFreshWorld(e.target.checked);
               }}
             />
-            <button
-              className="btn btn-primary"
-              style={{ flex: '0 0 auto' }}
-              disabled={busy}
-              onClick={joinRoom}
-            >
-              Join
-            </button>
-          </div>
-        </div>
+            <span>
+              <strong>Fresh world</strong> — reset progress when you enter
+            </span>
+          </label>
 
-        <div className="btn-row" style={{ marginTop: 4 }}>
-          <button className="btn btn-secondary" type="button" onClick={forceLatest}>
-            🔄 Reload latest (clear cache &amp; saves)
+          <button
+            type="button"
+            className="more-toggle"
+            onClick={() => {
+              sfx.click();
+              setShowMore((v) => !v);
+            }}
+          >
+            {showMore ? 'Hide extras ▲' : 'Controls & extras ▼'}
+          </button>
+
+          {showMore && (
+            <div className="title-extras">
+              {!isInvite && null}
+              {isInvite && (
+                <div className="btn-row" style={{ marginBottom: 10 }}>
+                  <button className="btn btn-secondary" disabled={busy} onClick={createRoom}>
+                    Create my own room
+                  </button>
+                  <button className="btn btn-secondary" disabled={busy} onClick={playSolo}>
+                    Solo
+                  </button>
+                </div>
+              )}
+              <div className="controls-help">
+                <div>
+                  <strong>Move:</strong> WASD or joystick
+                </div>
+                <div>
+                  <strong>Look:</strong> drag / look stick / Q·E
+                </div>
+                <div>
+                  <strong>Interact:</strong> Space or green button
+                </div>
+                <div>
+                  <strong>Weapons:</strong> 1 blaster · 2 grenade · F fire
+                </div>
+              </div>
+              <button className="btn btn-secondary btn-block" type="button" onClick={forceLatest}>
+                🔄 Reload latest (clear cache)
+              </button>
+              <p className="reset-hint">
+                Official game:{' '}
+                <span className="mono">robdon3.github.io/Cozy_Town/</span>
+              </p>
+            </div>
+          )}
+
+          {/* Spacer so sticky bar never covers last field */}
+          <div className="title-scroll-pad" />
+        </div>
+      </div>
+
+      {/* Sticky join bar — always visible on invite phones */}
+      {isInvite && (
+        <div className="title-sticky-bar">
+          <button
+            className="btn btn-primary btn-xl"
+            disabled={busy}
+            onClick={joinRoom}
+          >
+            {busy ? 'Joining…' : `Join ${inviteRoom} ▶`}
           </button>
         </div>
-        <p className="reset-hint">
-          Opens a clean copy of the game (fixes “stuck on old version”). Official URL:{' '}
-          <span className="mono">robdon3.github.io/Cozy_Town/</span>
-        </p>
-      </div>
+      )}
     </div>
   );
 }
