@@ -5,13 +5,18 @@ import * as THREE from 'three';
 import World from './World';
 import Player from './Player';
 import RemotePlayers from './RemotePlayers';
+import Projectiles, { ExplosionFX } from './Projectiles';
 import { useGameStore } from './store';
+import { applyLookDelta, lookState } from './lookState';
 
 const _desired = new THREE.Vector3();
+const _lookAt = new THREE.Vector3();
 
 function FollowCamera({ target }) {
-  const { camera } = useThree();
-  const offset = useRef(new THREE.Vector3(10, 12, 10));
+  const { camera, gl } = useThree();
+  const dragging = useRef(false);
+  const last = useRef({ x: 0, y: 0 });
+  const lookInput = useGameStore((s) => s.lookInput);
 
   useEffect(() => {
     camera.near = 0.1;
@@ -20,11 +25,115 @@ function FollowCamera({ target }) {
     camera.updateProjectionMatrix();
   }, [camera]);
 
-  useFrame(() => {
+  // Pointer look on canvas: right-button or two-finger / primary drag when holding Alt / middle
+  useEffect(() => {
+    const el = gl.domElement;
+
+    const onDown = (e) => {
+      // right mouse, middle mouse, or secondary touch — look
+      if (e.button === 2 || e.button === 1 || e.pointerType === 'pen') {
+        dragging.current = true;
+        lookState.dragging = true;
+        last.current = { x: e.clientX, y: e.clientY };
+        el.setPointerCapture?.(e.pointerId);
+      }
+    };
+    const onMove = (e) => {
+      if (!dragging.current) return;
+      const dx = e.clientX - last.current.x;
+      const dy = e.clientY - last.current.y;
+      last.current = { x: e.clientX, y: e.clientY };
+      applyLookDelta(dx, dy, 0.0055);
+    };
+    const onUp = () => {
+      dragging.current = false;
+      lookState.dragging = false;
+    };
+    // Left-drag on upper half for look on mobile/desktop without right button
+    const onLeftDown = (e) => {
+      if (e.button !== 0) return;
+      if (e.target.closest?.('.hud')) return;
+      const rect = el.getBoundingClientRect();
+      const relY = (e.clientY - rect.top) / rect.height;
+      // top 55% of game view starts look (bottom reserved for joystick feel)
+      if (relY < 0.55) {
+        dragging.current = true;
+        lookState.dragging = true;
+        last.current = { x: e.clientX, y: e.clientY };
+      }
+    };
+
+    el.addEventListener('pointerdown', onDown);
+    el.addEventListener('pointerdown', onLeftDown);
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onUp);
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    return () => {
+      el.removeEventListener('pointerdown', onDown);
+      el.removeEventListener('pointerdown', onLeftDown);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointercancel', onUp);
+    };
+  }, [gl]);
+
+  // Keyboard look Q/E + pitch with =/-
+  useEffect(() => {
+    const keys = {};
+    let raf = 0;
+    let alive = true;
+    const isTyping = (e) => {
+      const t = e.target;
+      return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+    };
+    const down = (e) => {
+      if (isTyping(e)) return;
+      keys[e.key.toLowerCase()] = true;
+    };
+    const up = (e) => {
+      keys[e.key.toLowerCase()] = false;
+    };
+    const tick = () => {
+      if (!alive) return;
+      const speed = 0.035;
+      if (keys.q) lookState.yaw += speed;
+      if (keys.e) lookState.yaw -= speed;
+      if (keys['='] || keys['+']) lookState.pitch = Math.min(1.25, lookState.pitch + speed * 0.7);
+      if (keys['-'] || keys['_']) lookState.pitch = Math.max(0.22, lookState.pitch - speed * 0.7);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => {
+      alive = false;
+      cancelAnimationFrame(raf);
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+    };
+  }, []);
+
+  useFrame((_, dt) => {
     if (!target.current) return;
-    _desired.copy(target.current).add(offset.current);
-    camera.position.lerp(_desired, 0.08);
-    camera.lookAt(target.current.x, target.current.y + 0.5, target.current.z);
+
+    // look stick / virtual look
+    if (lookInput.x || lookInput.y) {
+      applyLookDelta(lookInput.x * 420 * dt, lookInput.y * 420 * dt, 0.01);
+    }
+
+    const { yaw, pitch, distance } = lookState;
+    const cp = Math.cos(pitch);
+    const sp = Math.sin(pitch);
+    _desired.set(
+      target.current.x + Math.sin(yaw) * distance * cp,
+      target.current.y + distance * sp,
+      target.current.z + Math.cos(yaw) * distance * cp
+    );
+    camera.position.lerp(_desired, 1 - Math.pow(0.0008, dt));
+    _lookAt.set(target.current.x, target.current.y + 0.8, target.current.z);
+    camera.lookAt(_lookAt);
   });
 
   return null;
@@ -32,6 +141,9 @@ function FollowCamera({ target }) {
 
 function InteractKey() {
   const interact = useGameStore((s) => s.interact);
+  const tryFire = useGameStore((s) => s.tryFire);
+  const setEquippedWeapon = useGameStore((s) => s.setEquippedWeapon);
+
   useEffect(() => {
     const onKey = (e) => {
       const t = e.target;
@@ -39,13 +151,25 @@ function InteractKey() {
         return;
       }
       if (e.code === 'Space' || e.key === 'e' || e.key === 'E') {
-        e.preventDefault();
-        interact();
+        // E is also look-right — Space/interact preferred; E only if not used... 
+        // Keep Space + Enter for interact; F fire; G grenade equip; 1/2 weapons
+        if (e.code === 'Space' || e.key === 'Enter') {
+          e.preventDefault();
+          interact();
+        }
       }
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        tryFire();
+      }
+      if (e.key === '1') setEquippedWeapon('gun');
+      if (e.key === '2') setEquippedWeapon('grenade');
+      if (e.key === 'g' || e.key === 'G') setEquippedWeapon('grenade');
+      if (e.key === 'b' || e.key === 'B') setEquippedWeapon('gun');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [interact]);
+  }, [interact, tryFire, setEquippedWeapon]);
   return null;
 }
 
@@ -68,6 +192,8 @@ export default function GameCanvas() {
         <World />
         <Player cameraTarget={cameraTarget} />
         <RemotePlayers />
+        <Projectiles />
+        <ExplosionFX />
       </Suspense>
     </Canvas>
   );

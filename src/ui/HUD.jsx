@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../game/store';
-import { BUILDINGS, QUESTS, SHOP_ITEMS, WORLD } from '../game/data';
+import { BUILDINGS, NPCS, PIPE_LEAKS, QUESTS, SHOP_ITEMS, WORLD } from '../game/data';
 import Joystick from './Joystick';
+import LookStick from './LookStick';
 import { sfx, setMuted as setAudioMuted, startMusic, stopMusic } from '../audio/sounds';
 import { roomInviteUrl } from '../game/multiplayer';
 
@@ -9,6 +10,7 @@ function MiniMap() {
   const canvasRef = useRef(null);
   const player = useGameStore((s) => s.player);
   const remotePlayers = useGameStore((s) => s.remotePlayers);
+  const fixedLeaks = useGameStore((s) => s.fixedLeaks);
 
   useEffect(() => {
     const c = canvasRef.current;
@@ -28,6 +30,18 @@ function MiniMap() {
       ctx.fillRect(sx(b.x) - 2, sy(b.z) - 2, 4, 4);
     });
 
+    NPCS.filter((n) => n.role === 'plumber').forEach((n) => {
+      ctx.fillStyle = '#5B8DEF';
+      ctx.fillRect(sx(n.x) - 2, sy(n.z) - 2, 4, 4);
+    });
+
+    PIPE_LEAKS.forEach((leak) => {
+      ctx.fillStyle = fixedLeaks.includes(leak.id) ? '#4ade80' : '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(sx(leak.x), sy(leak.z), 2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
     Object.values(remotePlayers).forEach((p) => {
       ctx.fillStyle = '#c084fc';
       ctx.beginPath();
@@ -39,7 +53,7 @@ function MiniMap() {
     ctx.beginPath();
     ctx.arc(sx(player.x), sy(player.z), 3, 0, Math.PI * 2);
     ctx.fill();
-  }, [player.x, player.z, remotePlayers]);
+  }, [player.x, player.z, remotePlayers, fixedLeaks]);
 
   return (
     <div className="minimap">
@@ -83,10 +97,15 @@ export default function HUD() {
   const resetProgress = useGameStore((s) => s.resetProgress);
   const showToast = useGameStore((s) => s.showToast);
   const sendChat = useGameStore((s) => s.sendChat);
+  const equippedWeapon = useGameStore((s) => s.equippedWeapon);
+  const setEquippedWeapon = useGameStore((s) => s.setEquippedWeapon);
+  const tryFire = useGameStore((s) => s.tryFire);
+  const fixedLeaks = useGameStore((s) => s.fixedLeaks);
   const [chatText, setChatText] = useState('');
 
   const xpNeed = player.level * 100;
   const xpPct = Math.min(100, (player.xp / xpNeed) * 100);
+  const leaksLeft = PIPE_LEAKS.length - fixedLeaks.length;
 
   const inviteUrl = roomCode
     ? roomInviteUrl(roomCode)
@@ -179,6 +198,18 @@ export default function HUD() {
               <span className="mp-meta">{mpLabel}</span>
             </div>
           )}
+          <div className="pill" title="Leaking pipes left">
+            <span className="icon">💧</span>
+            {leaksLeft}
+          </div>
+          <div className="pill" title="Blaster ammo">
+            <span className="icon">🔫</span>
+            {player.ammo ?? 0}
+          </div>
+          <div className="pill" title="Grenades">
+            <span className="icon">💣</span>
+            {player.grenades ?? 0}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button className="icon-btn" onClick={share} title="Share invite">
@@ -272,10 +303,32 @@ export default function HUD() {
 
       <div className="hint">
         {nearby
-          ? `Near ${nearby.emoji} ${nearby.name} — tap Interact or press E / Space`
-          : roomCode
-            ? `Room ${roomCode} · invite friends with 📤 · WASD / joystick to move`
-            : 'WASD / joystick to move · E or Space to interact'}
+          ? `Near ${nearby.emoji} ${nearby.name}${nearby.title ? ` · ${nearby.title}` : ''} — ${nearby.action} (Space)`
+          : 'Drag to look · Q/E orbit · F fire · 1 blaster / 2 grenade · Space interact'}
+      </div>
+
+      <LookStick />
+
+      <div className="weapon-bar">
+        <button
+          type="button"
+          className={`weapon-slot ${equippedWeapon === 'gun' ? 'active' : ''}`}
+          onClick={() => setEquippedWeapon('gun')}
+        >
+          <span>🔫</span>
+          <small>1</small>
+        </button>
+        <button
+          type="button"
+          className={`weapon-slot ${equippedWeapon === 'grenade' ? 'active' : ''}`}
+          onClick={() => setEquippedWeapon('grenade')}
+        >
+          <span>💣</span>
+          <small>2</small>
+        </button>
+        <button type="button" className="fire-btn" onClick={() => tryFire()}>
+          FIRE
+        </button>
       </div>
 
       <div className="bottom-ui">

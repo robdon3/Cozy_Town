@@ -97,13 +97,19 @@ export default function TitleScreen() {
 
         <div className="controls-help">
           <div>
-            <strong>Move:</strong> WASD / arrows or joystick
+            <strong>Move:</strong> WASD / arrows or right joystick
           </div>
           <div>
-            <strong>Interact:</strong> E, Space, or green button
+            <strong>Look:</strong> drag screen / look stick / Q·E
           </div>
           <div>
-            <strong>Multiplayer:</strong> create a room or join a friend&apos;s code (P2P, no install)
+            <strong>Plumbers:</strong> talk to Nico&apos;s crew · Fix Pipe at 💧 leaks
+          </div>
+          <div>
+            <strong>Fun:</strong> 🔫 blaster (F / Fire) · 💣 grenades · shop for ammo
+          </div>
+          <div>
+            <strong>Multiplayer:</strong> create/join a room and share the invite link
           </div>
         </div>
 

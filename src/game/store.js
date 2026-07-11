@@ -5,12 +5,15 @@ import {
   BUILDINGS,
   INTERACT_RANGE,
   NPCS,
+  PIPE_LEAKS,
   QUESTS,
   SHOP_ITEMS,
+  WEAPONS,
 } from './data';
 import { sfx } from '../audio/sounds';
+import { getLookBasis } from './lookState';
 
-const SAVE_KEY = 'cozy-town-v2';
+const SAVE_KEY = 'cozy-town-v3';
 
 function loadSave() {
   try {
@@ -33,6 +36,8 @@ function defaultPlayer() {
     xp: 0,
     energy: 100,
     inventory: [],
+    ammo: 40,
+    grenades: 6,
   };
 }
 
@@ -51,10 +56,22 @@ function addInventoryItem(inventory, item) {
 
 export const useGameStore = create((set, get) => ({
   started: false,
-  player: saved?.player ?? defaultPlayer(),
+  player: {
+    ...defaultPlayer(),
+    ...(saved?.player || {}),
+    ammo: saved?.player?.ammo ?? defaultPlayer().ammo,
+    grenades: saved?.player?.grenades ?? defaultPlayer().grenades,
+  },
   completedQuests: saved?.completedQuests ?? [],
+  fixedLeaks: saved?.fixedLeaks ?? [],
+  npcDialogueIndex: {},
   messages: [
-    { id: 1, sender: 'System', text: 'Welcome to Cozy Town 3D! 🌟', system: true },
+    {
+      id: 1,
+      sender: 'System',
+      text: 'Welcome to Cozy Town! Meet the plumber crew at Pipeworks HQ 🔧',
+      system: true,
+    },
   ],
   panels: {
     menu: false,
@@ -69,6 +86,13 @@ export const useGameStore = create((set, get) => ({
   muted: saved?.muted ?? false,
   toast: null,
   moveInput: { x: 0, z: 0 },
+  lookInput: { x: 0, y: 0 },
+
+  // weapons & FX
+  equippedWeapon: 'gun', // gun | grenade
+  projectiles: [], // ephemeral bullets/grenades for R3F
+  explosions: [],
+  fireRequest: null, // { kind, id } consumed by Projectiles system
 
   // multiplayer
   roomCode: null,
@@ -81,6 +105,15 @@ export const useGameStore = create((set, get) => ({
 
   setMoveInput(x, z) {
     set({ moveInput: { x, z } });
+  },
+
+  setLookInput(x, y) {
+    set({ lookInput: { x, y } });
+  },
+
+  setEquippedWeapon(weapon) {
+    sfx.click();
+    set({ equippedWeapon: weapon });
   },
 
   startGame(name, avatar, options = {}) {
@@ -229,6 +262,24 @@ export const useGameStore = create((set, get) => ({
   updateNearby(px, pz) {
     let best = null;
     let bestDist = INTERACT_RANGE;
+    const { fixedLeaks } = get();
+
+    for (const leak of PIPE_LEAKS) {
+      if (fixedLeaks.includes(leak.id)) continue;
+      const dist = Math.hypot(px - leak.x, pz - leak.z);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = {
+          type: 'leak',
+          id: leak.id,
+          name: leak.name,
+          emoji: leak.emoji,
+          action: leak.action,
+          activity: 'fixpipe',
+          hint: leak.hint,
+        };
+      }
+    }
 
     for (const b of BUILDINGS) {
       const dx = px - b.x;
@@ -256,19 +307,14 @@ export const useGameStore = create((set, get) => ({
           id: n.id,
           name: n.name,
           emoji: n.emoji,
-          action: 'Talk',
+          action: n.role === 'plumber' ? 'Talk' : 'Talk',
           dialogue: n.dialogue,
+          role: n.role,
+          title: n.title,
         };
       }
     }
 
-    const prev = get().nearby;
-    if (
-      (prev?.type !== best?.type || prev?.id !== best?.id) &&
-      best
-    ) {
-      /* no sfx spam on enter */
-    }
     set({ nearby: best });
   },
 
@@ -316,12 +362,67 @@ export const useGameStore = create((set, get) => ({
   },
 
   interact() {
-    const { nearby, player } = get();
+    const { nearby, player, fixedLeaks, npcDialogueIndex } = get();
     if (!nearby) return;
 
     if (nearby.type === 'npc') {
+      const npc = NPCS.find((n) => n.id === nearby.id);
       sfx.talk();
-      get().pushMessage(nearby.name, nearby.dialogue);
+      if (npc?.dialogues?.length) {
+        const idx = npcDialogueIndex[npc.id] || 0;
+        const line = npc.dialogues[idx % npc.dialogues.length];
+        get().pushMessage(npc.name, line);
+        set({
+          npcDialogueIndex: {
+            ...npcDialogueIndex,
+            [npc.id]: (idx + 1) % npc.dialogues.length,
+          },
+        });
+      } else {
+        get().pushMessage(nearby.name, nearby.dialogue || '…');
+      }
+
+      // Meet the crew quest — talk to Nico
+      if (npc?.id === 10) {
+        get().completeQuestIfNeeded('talk-nico');
+      }
+      get().save();
+      return;
+    }
+
+    if (nearby.type === 'leak') {
+      if (fixedLeaks.includes(nearby.id)) {
+        get().pushMessage('System', 'This pipe is already sealed. 🔧', true);
+        return;
+      }
+      const act = ACTIVITIES.fixpipe;
+      const energyCost = Math.abs(act.energy);
+      if (player.energy < energyCost) {
+        sfx.error();
+        get().pushMessage('System', "You're too tired! Rest at the cafe. ☕", true);
+        return;
+      }
+      sfx.interact();
+      sfx.chop();
+      const inventory = addInventoryItem(player.inventory, act.item);
+      const nextFixed = [...fixedLeaks, nearby.id];
+      set({
+        fixedLeaks: nextFixed,
+        player: {
+          ...player,
+          coins: player.coins + act.coins,
+          energy: Math.max(0, Math.min(100, player.energy + act.energy)),
+          inventory,
+        },
+      });
+      get().grantXp(act.xp);
+      sfx.coin();
+      get().pushMessage('System', `${act.message} (${nearby.name})`, true);
+      get().completeQuestIfNeeded('fixpipe');
+      if (nextFixed.length >= PIPE_LEAKS.length) {
+        get().completeQuestIfNeeded('fixpipe-all');
+      }
+      get().save();
       return;
     }
 
@@ -336,6 +437,19 @@ export const useGameStore = create((set, get) => ({
       set((s) => ({ panels: { ...s.panels, quests: true, menu: false } }));
       get().completeQuestIfNeeded('townhall');
       get().save();
+      return;
+    }
+    if (activityKey === 'plumbhq') {
+      sfx.interact();
+      get().pushMessage(
+        'System',
+        'Pipeworks HQ! Talk to Nico, Yiannis, Sofia, Dimitri, and Elena around town.',
+        true
+      );
+      get().pushMessage(
+        'Nico “The Wrench”',
+        'Find the 💧 leaks and Fix Pipe — then try the blaster for fun!'
+      );
       return;
     }
 
@@ -389,8 +503,15 @@ export const useGameStore = create((set, get) => ({
 
     let energy = player.energy;
     let inventory = player.inventory;
+    let ammo = player.ammo;
+    let grenades = player.grenades;
+
     if (item.id === 'snack') {
       energy = Math.min(100, energy + 15);
+    } else if (item.id === 'ammo') {
+      ammo += 20;
+    } else if (item.id === 'grenades') {
+      grenades += 3;
     } else {
       inventory = addInventoryItem(inventory, {
         id: item.id,
@@ -406,14 +527,86 @@ export const useGameStore = create((set, get) => ({
         coins: player.coins - item.price,
         energy,
         inventory,
+        ammo,
+        grenades,
       },
     });
     get().pushMessage('System', `Bought ${item.emoji} ${item.name}!`, true);
     get().save();
   },
 
+  /** Request fire — Projectiles component spawns visuals; ammo deducted here */
+  tryFire() {
+    const { equippedWeapon, player } = get();
+    if (equippedWeapon === 'gun') {
+      if (player.ammo <= 0) {
+        sfx.error();
+        get().showToast('Out of ammo — buy at the shop!');
+        return;
+      }
+      set({
+        player: { ...player, ammo: player.ammo - 1 },
+        fireRequest: { kind: 'gun', id: Date.now() + Math.random() },
+      });
+      sfx.gunshot();
+      return;
+    }
+    if (equippedWeapon === 'grenade') {
+      if (player.grenades <= 0) {
+        sfx.error();
+        get().showToast('No grenades left!');
+        return;
+      }
+      set({
+        player: { ...player, grenades: player.grenades - 1 },
+        fireRequest: { kind: 'grenade', id: Date.now() + Math.random() },
+      });
+      sfx.grenadeThrow();
+    }
+  },
+
+  clearFireRequest() {
+    set({ fireRequest: null });
+  },
+
+  addProjectile(p) {
+    set((s) => ({ projectiles: [...s.projectiles, p] }));
+  },
+
+  setProjectiles(list) {
+    set({ projectiles: list });
+  },
+
+  addExplosion(e) {
+    set((s) => ({ explosions: [...s.explosions.slice(-8), e] }));
+  },
+
+  removeExplosion(id) {
+    set((s) => ({ explosions: s.explosions.filter((x) => x.id !== id) }));
+  },
+
+  /** Funny hit reactions when blaster tags an NPC */
+  onNpcHit(npcId) {
+    const npc = NPCS.find((n) => n.id === npcId);
+    if (!npc) return;
+    const lines = [
+      'Hey! Watch the pipes!',
+      'Ow — rubber bullet? Still rude!',
+      'I’m on break!',
+      'That tickles. Focus on the leaks!',
+      'Nico will hear about this…',
+    ];
+    get().pushMessage(npc.name, lines[Math.floor(Math.random() * lines.length)]);
+  },
+
+  getAimDirection() {
+    const { forwardX, forwardZ } = getLookBasis();
+    // slight upward for throws
+    return { x: forwardX, y: 0.12, z: forwardZ };
+  },
+
   save() {
-    const { player, completedQuests, muted } = get();
+    const { player, completedQuests, muted, fixedLeaks } = get();
     try {
       localStorage.setItem(
         SAVE_KEY,
@@ -428,8 +621,11 @@ export const useGameStore = create((set, get) => ({
             inventory: player.inventory,
             x: player.x,
             z: player.z,
+            ammo: player.ammo,
+            grenades: player.grenades,
           },
           completedQuests,
+          fixedLeaks,
           muted,
         })
       );
@@ -445,6 +641,7 @@ export const useGameStore = create((set, get) => ({
     set({
       player: { ...defaultPlayer(), name, avatar },
       completedQuests: [],
+      fixedLeaks: [],
       messages: [
         { id: Date.now(), sender: 'System', text: 'Progress reset. Fresh start!', system: true },
       ],
@@ -452,3 +649,6 @@ export const useGameStore = create((set, get) => ({
     get().save();
   },
 }));
+
+// re-export for systems
+export { WEAPONS };

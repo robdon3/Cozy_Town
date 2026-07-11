@@ -1,8 +1,11 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import { BUILDINGS, NPCS, WORLD } from './data';
+import { BUILDINGS, NPCS, PIPE_LEAKS, WORLD } from './data';
 import { createCharacterTexture, createEmojiTexture, createLabelTexture } from './sprites';
 import { Billboard } from '@react-three/drei';
+import { useFrame } from '@react-three/fiber';
+import { useRef } from 'react';
+import { useGameStore } from './store';
 
 function Ground() {
   const grass = useMemo(() => {
@@ -174,7 +177,15 @@ function NpcSprite({ npc }) {
     () => createCharacterTexture(npc.emoji, npc.color),
     [npc.emoji, npc.color]
   );
-  const label = useMemo(() => createLabelTexture(npc.name), [npc.name]);
+  const labelText =
+    npc.role === 'plumber'
+      ? `🔧 ${npc.name}`
+      : npc.name;
+  const label = useMemo(() => createLabelTexture(labelText), [labelText]);
+  const titleTex = useMemo(
+    () => (npc.title ? createLabelTexture(npc.title, 'rgba(40,70,120,0.88)') : null),
+    [npc.title]
+  );
 
   return (
     <group position={[npc.x, 0, npc.z]}>
@@ -184,11 +195,17 @@ function NpcSprite({ npc }) {
         </sprite>
       </Billboard>
       <Billboard position={[0, 2.4, 0]}>
-        <sprite scale={[2.4, 0.6, 1]}>
+        <sprite scale={[npc.role === 'plumber' ? 3.0 : 2.4, 0.6, 1]}>
           <spriteMaterial map={label} transparent depthWrite={false} />
         </sprite>
       </Billboard>
-      {/* tiny ground marker */}
+      {titleTex && (
+        <Billboard position={[0, 2.95, 0]}>
+          <sprite scale={[2.2, 0.5, 1]}>
+            <spriteMaterial map={titleTex} transparent depthWrite={false} />
+          </sprite>
+        </Billboard>
+      )}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
         <circleGeometry args={[0.45, 16]} />
         <meshStandardMaterial color={npc.color} transparent opacity={0.45} />
@@ -290,6 +307,58 @@ function Fountain() {
   );
 }
 
+function PipeLeak({ leak }) {
+  const fixedLeaks = useGameStore((s) => s.fixedLeaks);
+  const fixed = fixedLeaks.includes(leak.id);
+  const bob = useRef(0);
+  const group = useRef();
+  const dripTex = useMemo(() => createEmojiTexture(fixed ? '✅' : leak.emoji), [fixed, leak.emoji]);
+  const label = useMemo(
+    () => createLabelTexture(fixed ? `${leak.name} (fixed)` : `${leak.emoji} ${leak.name}`),
+    [fixed, leak.emoji, leak.name]
+  );
+
+  useFrame((_, dt) => {
+    if (!group.current || fixed) return;
+    bob.current += dt * 4;
+    group.current.position.y = 0.9 + Math.sin(bob.current) * 0.12;
+  });
+
+  return (
+    <group position={[leak.x, 0, leak.z]}>
+      {/* pipe stub */}
+      <mesh position={[0, 0.35, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+        <cylinderGeometry args={[0.18, 0.18, 1.2, 8]} />
+        <meshStandardMaterial color={fixed ? '#6a8f6a' : '#8a8a96'} metalness={0.4} roughness={0.45} />
+      </mesh>
+      {!fixed && (
+        <mesh position={[0.5, 0.15, 0]}>
+          <sphereGeometry args={[0.2, 10, 10]} />
+          <meshStandardMaterial
+            color="#4aa3d4"
+            transparent
+            opacity={0.7}
+            emissive="#3a90c4"
+            emissiveIntensity={0.4}
+          />
+        </mesh>
+      )}
+      <group ref={group} position={[0, 0.9, 0]}>
+        <Billboard>
+          <sprite scale={[1.1, 1.1, 1]}>
+            <spriteMaterial map={dripTex} transparent depthWrite={false} />
+          </sprite>
+        </Billboard>
+      </group>
+      <Billboard position={[0, 2.1, 0]}>
+        <sprite scale={[2.8, 0.65, 1]}>
+          <spriteMaterial map={label} transparent depthWrite={false} />
+        </sprite>
+      </Billboard>
+    </group>
+  );
+}
+
 function Flower({ position, emoji }) {
   const tex = useMemo(() => createEmojiTexture(emoji, 64), [emoji]);
   return (
@@ -332,6 +401,9 @@ export default function World() {
       ))}
       {NPCS.map((n) => (
         <NpcSprite key={n.id} npc={n} />
+      ))}
+      {PIPE_LEAKS.map((leak) => (
+        <PipeLeak key={leak.id} leak={leak} />
       ))}
 
       {/* town square fountain */}

@@ -665,6 +665,105 @@ button {
   border-color: var(--accent);
 }
 
+.look-stick {
+  position: absolute;
+  left: 14px;
+  bottom: calc(150px + var(--safe-bottom));
+  width: 110px;
+  touch-action: none;
+  z-index: 25;
+}
+
+.look-stick-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.look-stick-base {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.32);
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  position: relative;
+  margin: 0 auto;
+  backdrop-filter: blur(4px);
+}
+
+.look-stick-knob {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, #c9e4ff, #7eb6ff);
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+.weapon-bar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(14px + var(--safe-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  z-index: 26;
+  pointer-events: auto;
+}
+
+.weapon-slot {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 2px solid var(--panel-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.weapon-slot small {
+  font-size: 9px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.weapon-slot.active {
+  border-color: var(--accent-2);
+  background: rgba(246, 196, 83, 0.2);
+  box-shadow: 0 0 0 2px rgba(246, 196, 83, 0.25);
+}
+
+.fire-btn {
+  min-width: 72px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(160deg, #ff7b54, #c23b22);
+  border: 2px solid #8b1e0f;
+  color: white;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  font-size: 13px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.fire-btn:active {
+  transform: scale(0.96);
+}
+
 /* allow typing in chat without game steal */
 .chat-compose input,
 .field input,

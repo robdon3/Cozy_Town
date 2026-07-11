@@ -22,12 +22,37 @@ A cozy **3D browser game** you can play instantly — including **live multiplay
 | Place | What to do |
 |-------|------------|
 | Cozy Cafe ☕ | Restore energy |
-| General Store 🏪 | Buy items |
+| General Store 🏪 | Buy items, ammo, grenades |
 | Central Park 🌳 | Relax |
 | Town Hall 🏛️ | View & complete quests |
 | Fishing Dock 🎣 | Catch fish |
 | Dark Forest 🌲 | Chop wood |
 | Crystal Mine ⛏️ | Mine ore |
+| Pipeworks HQ 🔧 | Home of the plumber crew |
+
+## Plumber crew
+
+Talk to **Nico, Yiannis, Sofia, Dimitri, and Elena** (multiple dialogue lines).  
+Find **💧 leaking pipes** around town and **Fix Pipe** for coins/XP.
+
+## Weapons (arcade / for fun)
+
+| Control | Action |
+|---------|--------|
+| **1** or 🔫 slot | Equip Plumber Blaster |
+| **2** or 💣 slot | Equip Wrench Grenade |
+| **F** / FIRE button | Shoot / throw |
+| Shop | Restock ammo & grenades |
+
+## Camera look
+
+| Control | Action |
+|---------|--------|
+| Drag on the world (upper area) | Orbit look |
+| Right mouse drag | Orbit look |
+| Look stick (bottom-left) | Mobile look |
+| **Q** / **E** | Rotate camera |
+| **=** / **-** | Pitch up / down |
 
 ## Multiplayer
 

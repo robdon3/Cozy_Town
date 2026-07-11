@@ -107,8 +107,23 @@ export const BUILDINGS = [
     action: 'Mine Ore',
     activity: 'mine',
   },
+  {
+    id: 'plumbhq',
+    name: 'Pipeworks HQ',
+    x: -12,
+    z: 18,
+    w: 8,
+    d: 6,
+    h: 4.8,
+    color: '#4A6FA5',
+    roof: '#2C4060',
+    emoji: '🔧',
+    action: 'Visit Crew',
+    activity: 'plumbhq',
+  },
 ];
 
+/** Town locals + the Greek plumber crew */
 export const NPCS = [
   {
     id: 1,
@@ -117,7 +132,9 @@ export const NPCS = [
     z: 8,
     emoji: '👨‍💼',
     color: '#F5D76E',
-    dialogue: "Welcome to Cozy Town! Complete quests at Town Hall to earn rewards.",
+    role: 'mayor',
+    action: 'Talk',
+    dialogue: "Welcome to Cozy Town! The plumber crew keeps our pipes flowing — go say hi at Pipeworks HQ!",
   },
   {
     id: 2,
@@ -126,7 +143,9 @@ export const NPCS = [
     z: -6,
     emoji: '👩‍🍳',
     color: '#F8B4C4',
-    dialogue: 'Fresh coffee restores energy. Come by anytime!',
+    role: 'cafe',
+    action: 'Talk',
+    dialogue: 'Fresh coffee restores energy. The sink was dripping until Sofia fixed it!',
   },
   {
     id: 3,
@@ -135,7 +154,9 @@ export const NPCS = [
     z: 2,
     emoji: '🛍️',
     color: '#A8E6CF',
-    dialogue: 'I stock tools and snacks. Spend those hard-earned coins!',
+    role: 'shop',
+    action: 'Talk',
+    dialogue: 'I stock tools, snacks… and for fun, blasters and grenades. Don’t tell the mayor.',
   },
   {
     id: 4,
@@ -144,7 +165,9 @@ export const NPCS = [
     z: 20,
     emoji: '🎣',
     color: '#8EC5E8',
-    dialogue: 'The fish are biting near the dock. Cast a line!',
+    role: 'fisher',
+    action: 'Talk',
+    dialogue: 'The fish are biting today! Watch the dock pipes — Dimitri patched one last week.',
   },
   {
     id: 5,
@@ -153,7 +176,141 @@ export const NPCS = [
     z: -20,
     emoji: '🪓',
     color: '#C4A484',
-    dialogue: 'Need lumber? The forest always has more trees.',
+    role: 'wood',
+    action: 'Talk',
+    dialogue: 'Need lumber? The forest always has more trees. Tell Nico I said hi!',
+  },
+  // —— Plumber crew ——
+  {
+    id: 10,
+    name: 'Nico “The Wrench”',
+    x: -10,
+    z: 16,
+    emoji: '🧑‍🔧',
+    color: '#5B8DEF',
+    role: 'plumber',
+    title: 'Crew Boss',
+    action: 'Talk',
+    dialogue:
+      'Kalimera! I’m Nico, boss of the plumber crew. Fix the leaking pipes around town — talk to the crew and use Fix Pipe at the leaks!',
+    dialogues: [
+      'Kalimera! I’m Nico, boss of the plumber crew.',
+      'Leaks pop up near the fountain, cafe, dock, and HQ. Fix them for coins!',
+      'Need firepower? Sam sells a Plumber Blaster and Wrench Grenades. Pure chaos. Pure fun.',
+      'A good plumber listens to the pipes… and never loses their wrench.',
+    ],
+  },
+  {
+    id: 11,
+    name: 'Yiannis',
+    x: 3,
+    z: 1,
+    emoji: '🧔',
+    color: '#7EB6FF',
+    role: 'plumber',
+    title: 'Pipe Whisperer',
+    action: 'Talk',
+    dialogue: 'This fountain spring is a drama queen. Stand close to the leak and hit Fix Pipe!',
+    dialogues: [
+      'Yiannis here — I talk to pipes. They talk back.',
+      'Fountain leak is right here. Fix it before the park becomes a pool!',
+      'Pressure is poetry. Also, don’t grenade the main valve. Please.',
+    ],
+  },
+  {
+    id: 12,
+    name: 'Sofia',
+    x: -14,
+    z: -10,
+    emoji: '👩‍🔧',
+    color: '#FF9ECD',
+    role: 'plumber',
+    title: 'Junior Ace',
+    action: 'Talk',
+    dialogue: 'Sofia! Cafe pipes are my beat. Grab a wrench energy and fix the leak by the kitchen wall.',
+    dialogues: [
+      'Hey! Sofia — junior ace of the crew.',
+      'Cafe leak is behind Luna’s place. Fix Pipe when you’re close!',
+      'Coffee + plumbing = the Cozy Town dream.',
+    ],
+  },
+  {
+    id: 13,
+    name: 'Dimitri',
+    x: -26,
+    z: 18,
+    emoji: '🔧',
+    color: '#FFB347',
+    role: 'plumber',
+    title: 'Dock Specialist',
+    action: 'Talk',
+    dialogue: 'Dimitri at your service! Dock pipes freeze, crack, then party. Fix the leak on the pier.',
+    dialogues: [
+      'Dimitri — dock pipes, storms, and snacks.',
+      'Pier leak is right by the water. One Fix Pipe and we’re golden.',
+      'Between you and me, the blaster is great for “persuading” stubborn valves. Wink.',
+    ],
+  },
+  {
+    id: 14,
+    name: 'Elena',
+    x: -8,
+    z: 20,
+    emoji: '😎',
+    color: '#C3A6FF',
+    role: 'plumber',
+    title: 'Demo & Drama',
+    action: 'Talk',
+    dialogue: 'Elena. I handle “controlled demolitions”… I mean pressure releases. Wrench Grenades go boom, pipes go calm.',
+    dialogues: [
+      'Elena — demo specialist. Mostly jokes. Mostly.',
+      'HQ side leak needs a hero. Fix Pipe, then maybe toss a grenade at a rock for fun.',
+      'Look around with right-drag or the look stick. You’ll see my handiwork everywhere.',
+    ],
+  },
+];
+
+/** Interactable leaking pipes */
+export const PIPE_LEAKS = [
+  {
+    id: 'leak-fountain',
+    name: 'Fountain Leak',
+    x: 1.5,
+    z: -1.5,
+    emoji: '💧',
+    action: 'Fix Pipe',
+    activity: 'fixpipe',
+    hint: 'Yiannis is watching this one',
+  },
+  {
+    id: 'leak-cafe',
+    name: 'Cafe Pipe Leak',
+    x: -15,
+    z: -11,
+    emoji: '🚰',
+    action: 'Fix Pipe',
+    activity: 'fixpipe',
+    hint: 'Sofia’s job site',
+  },
+  {
+    id: 'leak-dock',
+    name: 'Dock Pipe Crack',
+    x: -24,
+    z: 20,
+    emoji: '💦',
+    action: 'Fix Pipe',
+    activity: 'fixpipe',
+    hint: 'Dimitri’s specialty',
+  },
+  {
+    id: 'leak-hq',
+    name: 'HQ Pressure Valve',
+    x: -9,
+    z: 21,
+    emoji: '🔧',
+    action: 'Fix Pipe',
+    activity: 'fixpipe',
+    hint: 'Elena left tools here',
   },
 ];
 
@@ -193,6 +350,27 @@ export const QUESTS = [
     reward: { coins: 80, xp: 40 },
     completeOn: 'mine',
   },
+  {
+    id: 'meet-crew',
+    title: 'Meet the Crew',
+    description: 'Talk to Nico at Pipeworks HQ',
+    reward: { coins: 40, xp: 25 },
+    completeOn: 'talk-nico',
+  },
+  {
+    id: 'pipe-rookie',
+    title: 'Pipe Rookie',
+    description: 'Fix any leaking pipe',
+    reward: { coins: 70, xp: 35 },
+    completeOn: 'fixpipe',
+  },
+  {
+    id: 'master-plumber',
+    title: 'Master Plumber',
+    description: 'Fix 4 leaks around town',
+    reward: { coins: 200, xp: 100 },
+    completeOn: 'fixpipe-all',
+  },
 ];
 
 export const SHOP_ITEMS = [
@@ -201,6 +379,9 @@ export const SHOP_ITEMS = [
   { id: 'pick', name: 'Iron Pick', emoji: '⛏️', price: 50, desc: 'Mine faster… spiritually' },
   { id: 'snack', name: 'Trail Mix', emoji: '🥜', price: 12, desc: 'Restores 15 energy' },
   { id: 'hat', name: 'Cozy Cap', emoji: '🧢', price: 75, desc: 'Looking good in town' },
+  { id: 'wrench', name: 'Golden Wrench', emoji: '🔧', price: 35, desc: 'Badge of the plumber crew' },
+  { id: 'ammo', name: 'Blaster Ammo ×20', emoji: '🔫', price: 25, desc: 'Restock the Plumber Blaster' },
+  { id: 'grenades', name: 'Wrench Grenades ×3', emoji: '💣', price: 40, desc: 'Arcade boom — pure fun' },
 ];
 
 export const ACTIVITIES = {
@@ -239,8 +420,44 @@ export const ACTIVITIES = {
     message: 'You relax in the peaceful park. 🌳',
     item: null,
   },
+  fixpipe: {
+    xp: 22,
+    coins: 45,
+    energy: -12,
+    message: 'Pipe sealed tight! The crew would be proud. 🔧',
+    item: { id: 'pipe-scrap', name: 'Pipe Scrap', emoji: '🔩' },
+  },
+  plumbhq: {
+    xp: 5,
+    coins: 0,
+    energy: 0,
+    message: 'Pipeworks HQ — home of Cozy Town’s finest plumbers!',
+    item: null,
+  },
 };
 
-export const AVATARS = ['😊', '😎', '🧑‍🔧', '👩‍🌾', '🧔', '🧒', '🦊', '🐱', '🐸', '🦉'];
+export const AVATARS = ['😊', '😎', '🧑‍🔧', '👩‍🔧', '🧔', '🧒', '🦊', '🐱', '🐸', '🦉'];
 
 export const INTERACT_RANGE = 5.5;
+
+/** Cartoon weapons — for fun, not realism */
+export const WEAPONS = {
+  gun: {
+    id: 'gun',
+    name: 'Plumber Blaster',
+    emoji: '🔫',
+    cooldown: 0.18,
+    speed: 42,
+    lifetime: 1.2,
+    damage: 1,
+  },
+  grenade: {
+    id: 'grenade',
+    name: 'Wrench Grenade',
+    emoji: '💣',
+    cooldown: 0.9,
+    throwSpeed: 14,
+    fuse: 1.35,
+    radius: 5,
+  },
+};

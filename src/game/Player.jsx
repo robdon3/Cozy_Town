@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { createCharacterTexture, createLabelTexture } from './sprites';
 import { useGameStore } from './store';
 import { WORLD } from './data';
+import { getLookBasis } from './lookState';
 import { sfx } from '../audio/sounds';
 
 const SPEED = 8;
@@ -74,13 +75,20 @@ export default function Player({ cameraTarget }) {
       ix /= len;
       iz /= len;
       moving = true;
+      // camera-relative movement
+      const { forwardX, forwardZ, rightX, rightZ } = getLookBasis();
+      // W/up is -iz in input → forward
+      const forwardInput = -iz;
+      const rightInput = ix;
+      const wx = rightInput * rightX + forwardInput * forwardX;
+      const wz = rightInput * rightZ + forwardInput * forwardZ;
       const nx = THREE.MathUtils.clamp(
-        group.current.position.x + ix * SPEED * dt,
+        group.current.position.x + wx * SPEED * dt,
         -BOUND,
         BOUND
       );
       const nz = THREE.MathUtils.clamp(
-        group.current.position.z + iz * SPEED * dt,
+        group.current.position.z + wz * SPEED * dt,
         -BOUND,
         BOUND
       );

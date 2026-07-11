@@ -151,6 +151,21 @@ export const sfx = {
     tone({ freq: 600, type: 'sine', duration: 0.1, gain: 0.08 });
     tone({ freq: 900, type: 'sine', duration: 0.14, gain: 0.07, delay: 0.08 });
   },
+  gunshot() {
+    noiseBurst({ duration: 0.08, gain: 0.12, filterFreq: 2200 });
+    tone({ freq: 180, type: 'square', duration: 0.06, gain: 0.06, freqEnd: 60 });
+  },
+  grenadeThrow() {
+    tone({ freq: 220, type: 'triangle', duration: 0.12, gain: 0.07, freqEnd: 140 });
+  },
+  explosion() {
+    noiseBurst({ duration: 0.35, gain: 0.18, filterFreq: 400 });
+    tone({ freq: 90, type: 'sawtooth', duration: 0.3, gain: 0.1, freqEnd: 40 });
+  },
+  hit() {
+    tone({ freq: 200, type: 'square', duration: 0.08, gain: 0.06 });
+    noiseBurst({ duration: 0.06, gain: 0.05, filterFreq: 900 });
+  },
 };
 
 export function startMusic() {
