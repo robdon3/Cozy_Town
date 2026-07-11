@@ -102,14 +102,57 @@ export default function HUD() {
   const tryFire = useGameStore((s) => s.tryFire);
   const fixedLeaks = useGameStore((s) => s.fixedLeaks);
   const [chatText, setChatText] = useState('');
+  const [chatExpanded, setChatExpanded] = useState(false);
+  const [flashVisible, setFlashVisible] = useState(false);
+  const [flashHiding, setFlashHiding] = useState(false);
   const chatLogRef = useRef(null);
+  const lastMsgId = useRef(null);
+  const flashTimer = useRef(null);
 
-  // Keep newest messages in view when chat grows / wraps
+  const latestMsg = messages.length ? messages[messages.length - 1] : null;
+  const visibleLog = messages.slice(-8);
+
+  // Flash only the newest line briefly; full history stays behind 💬
+  useEffect(() => {
+    if (!latestMsg) return;
+    if (latestMsg.id === lastMsgId.current) return;
+    lastMsgId.current = latestMsg.id;
+
+    if (chatExpanded || panels.chat) return;
+
+    setFlashHiding(false);
+    setFlashVisible(true);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => {
+      setFlashHiding(true);
+      flashTimer.current = setTimeout(() => {
+        setFlashVisible(false);
+        setFlashHiding(false);
+      }, 380);
+    }, 3200);
+
+    return () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    };
+  }, [latestMsg, chatExpanded, panels.chat]);
+
   useEffect(() => {
     const el = chatLogRef.current;
-    if (!el) return;
+    if (!el || !chatExpanded) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [messages, chatExpanded, panels.chat]);
+
+  const openChat = () => {
+    setChatExpanded(true);
+    setFlashVisible(false);
+    if (!panels.chat) togglePanel('chat');
+  };
+
+  const closeChat = () => {
+    setChatExpanded(false);
+    setFlashVisible(false);
+    if (panels.chat) closePanels();
+  };
 
   const xpNeed = player.level * 100;
   const xpPct = Math.min(100, (player.xp / xpNeed) * 100);
@@ -225,8 +268,11 @@ export default function HUD() {
               📤
             </button>
             <button
-              className={`icon-btn ${panels.chat ? 'active' : ''}`}
-              onClick={() => togglePanel('chat')}
+              className={`icon-btn ${chatExpanded || panels.chat ? 'active' : ''}`}
+              onClick={() => {
+                if (chatExpanded || panels.chat) closeChat();
+                else openChat();
+              }}
               title="Chat"
             >
               💬
@@ -248,13 +294,67 @@ export default function HUD() {
           </div>
         </div>
 
-        <div className="chat-log" ref={chatLogRef}>
-          {messages.map((m) => (
-            <div key={m.id} className={`chat-line ${m.system ? 'system' : ''}`}>
-              <strong>{m.sender}:</strong> {m.text}
+      </div>
+
+      <div className="chat-dock">
+        {chatExpanded || panels.chat ? (
+          <div className="chat-panel">
+            <div className="chat-panel-head">
+              <span>Chat {roomCode ? `· ${roomCode}` : ''}</span>
+              <button type="button" onClick={closeChat} aria-label="Close chat">
+                ✕
+              </button>
             </div>
-          ))}
-        </div>
+            <div className="chat-log" ref={chatLogRef}>
+              {visibleLog.map((m) => (
+                <div key={m.id} className={`chat-line ${m.system ? 'system' : ''}`}>
+                  <strong>{m.sender}:</strong> {m.text}
+                </div>
+              ))}
+            </div>
+            <form className="chat-compose" onSubmit={submitChat}>
+              <input
+                value={chatText}
+                onChange={(e) => setChatText(e.target.value)}
+                placeholder={roomCode ? 'Message friends…' : 'Note…'}
+                maxLength={120}
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ flex: '0 0 auto', padding: '10px 14px' }}
+              >
+                Send
+              </button>
+            </form>
+          </div>
+        ) : (
+          flashVisible &&
+          latestMsg && (
+            <button
+              type="button"
+              className={`chat-flash ${latestMsg.system ? 'system' : ''} ${flashHiding ? 'hiding' : ''}`}
+              onClick={openChat}
+              title="Open chat"
+            >
+              <span className="chat-flash-body">
+                <strong>{latestMsg.sender}:</strong>
+                {latestMsg.text}
+              </span>
+              <span
+                className="chat-flash-x"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFlashVisible(false);
+                }}
+                role="presentation"
+              >
+                ✕
+              </span>
+            </button>
+          )
+        )}
       </div>
 
       {panels.menu && <MiniMap />}
@@ -294,21 +394,6 @@ export default function HUD() {
             ⚙️ Settings
           </button>
         </div>
-      )}
-
-      {panels.chat && (
-        <form className="chat-compose" onSubmit={submitChat}>
-          <input
-            value={chatText}
-            onChange={(e) => setChatText(e.target.value)}
-            placeholder={roomCode ? 'Say hi to the room…' : 'Local note…'}
-            maxLength={120}
-            autoFocus
-          />
-          <button type="submit" className="btn btn-primary" style={{ flex: '0 0 auto', padding: '10px 14px' }}>
-            Send
-          </button>
-        </form>
       )}
 
       <div className="hint">
