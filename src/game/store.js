@@ -216,7 +216,7 @@ export const useGameStore = create((set, get) => ({
   pushMessage(sender, text, system = false) {
     set((s) => ({
       messages: [
-        ...s.messages.slice(-8),
+        ...s.messages.slice(-12),
         { id: Date.now() + Math.random(), sender, text, system },
       ],
     }));

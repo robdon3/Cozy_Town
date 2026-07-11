@@ -102,6 +102,14 @@ export default function HUD() {
   const tryFire = useGameStore((s) => s.tryFire);
   const fixedLeaks = useGameStore((s) => s.fixedLeaks);
   const [chatText, setChatText] = useState('');
+  const chatLogRef = useRef(null);
+
+  // Keep newest messages in view when chat grows / wraps
+  useEffect(() => {
+    const el = chatLogRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages]);
 
   const xpNeed = player.level * 100;
   const xpPct = Math.min(100, (player.xp / xpNeed) * 100);
@@ -172,79 +180,81 @@ export default function HUD() {
 
   return (
     <div className="hud">
-      <div className="top-bar">
-        <div className="stat-pills">
-          <div className="pill">
-            <span className="icon">💰</span>
-            {player.coins}
-          </div>
-          <div className="pill">
-            <span className="icon">⭐</span>
-            Lv.{player.level}
-            <div className="xp-track" title={`${player.xp}/${xpNeed} XP`}>
-              <div className="xp-fill" style={{ width: `${xpPct}%` }} />
+      <div className="hud-top">
+        <div className="top-bar">
+          <div className="stat-pills">
+            <div className="pill">
+              <span className="icon">💰</span>
+              {player.coins}
+            </div>
+            <div className="pill">
+              <span className="icon">⭐</span>
+              Lv.{player.level}
+              <div className="xp-track" title={`${player.xp}/${xpNeed} XP`}>
+                <div className="xp-fill" style={{ width: `${xpPct}%` }} />
+              </div>
+            </div>
+            <div className="pill">
+              <span className="icon">❤️</span>
+              <div className="energy-track">
+                <div className="energy-fill" style={{ width: `${player.energy}%` }} />
+              </div>
+            </div>
+            {roomCode && (
+              <div className={`pill mp-pill ${mpStatus}`}>
+                <span className="icon">🟢</span>
+                <span className="room-code">{roomCode}</span>
+                <span className="mp-meta">{mpLabel}</span>
+              </div>
+            )}
+            <div className="pill" title="Leaking pipes left">
+              <span className="icon">💧</span>
+              {leaksLeft}
+            </div>
+            <div className="pill" title="Blaster ammo">
+              <span className="icon">🔫</span>
+              {player.ammo ?? 0}
+            </div>
+            <div className="pill" title="Grenades">
+              <span className="icon">💣</span>
+              {player.grenades ?? 0}
             </div>
           </div>
-          <div className="pill">
-            <span className="icon">❤️</span>
-            <div className="energy-track">
-              <div className="energy-fill" style={{ width: `${player.energy}%` }} />
-            </div>
-          </div>
-          {roomCode && (
-            <div className={`pill mp-pill ${mpStatus}`}>
-              <span className="icon">🟢</span>
-              <span className="room-code">{roomCode}</span>
-              <span className="mp-meta">{mpLabel}</span>
-            </div>
-          )}
-          <div className="pill" title="Leaking pipes left">
-            <span className="icon">💧</span>
-            {leaksLeft}
-          </div>
-          <div className="pill" title="Blaster ammo">
-            <span className="icon">🔫</span>
-            {player.ammo ?? 0}
-          </div>
-          <div className="pill" title="Grenades">
-            <span className="icon">💣</span>
-            {player.grenades ?? 0}
+          <div className="top-bar-actions">
+            <button className="icon-btn" onClick={share} title="Share invite">
+              📤
+            </button>
+            <button
+              className={`icon-btn ${panels.chat ? 'active' : ''}`}
+              onClick={() => togglePanel('chat')}
+              title="Chat"
+            >
+              💬
+            </button>
+            <button
+              className={`icon-btn ${muted ? 'active' : ''}`}
+              onClick={toggleMute}
+              title="Sound"
+            >
+              {muted ? '🔇' : '🔊'}
+            </button>
+            <button
+              className={`icon-btn ${panels.menu ? 'active' : ''}`}
+              onClick={() => togglePanel('menu')}
+              title="Menu"
+            >
+              ☰
+            </button>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button className="icon-btn" onClick={share} title="Share invite">
-            📤
-          </button>
-          <button
-            className={`icon-btn ${panels.chat ? 'active' : ''}`}
-            onClick={() => togglePanel('chat')}
-            title="Chat"
-          >
-            💬
-          </button>
-          <button
-            className={`icon-btn ${muted ? 'active' : ''}`}
-            onClick={toggleMute}
-            title="Sound"
-          >
-            {muted ? '🔇' : '🔊'}
-          </button>
-          <button
-            className={`icon-btn ${panels.menu ? 'active' : ''}`}
-            onClick={() => togglePanel('menu')}
-            title="Menu"
-          >
-            ☰
-          </button>
-        </div>
-      </div>
 
-      <div className="chat-log">
-        {messages.map((m) => (
-          <div key={m.id} className={`chat-line ${m.system ? 'system' : ''}`}>
-            <strong>{m.sender}:</strong> {m.text}
-          </div>
-        ))}
+        <div className="chat-log" ref={chatLogRef}>
+          {messages.map((m) => (
+            <div key={m.id} className={`chat-line ${m.system ? 'system' : ''}`}>
+              <strong>{m.sender}:</strong> {m.text}
+            </div>
+          ))}
+        </div>
       </div>
 
       {panels.menu && <MiniMap />}
